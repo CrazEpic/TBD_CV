@@ -62,7 +62,8 @@ with holistic.Holistic(
 
         if results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
-            joints = [[lm.x, lm.y, lm.z] for lm in landmarks]
+            # landmarks = results.pose_world_landmarks.landmark
+            joints = [[lm.x, lm.y, lm.z, lm.visibility] for lm in landmarks]
             
             joints_array = np.array(joints, dtype=np.float32)
             data_flat = joints_array.flatten()

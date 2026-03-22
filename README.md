@@ -8,3 +8,10 @@ python -m ensurepip --upgrade
 python -m pip debug --verbose
 https://pypi.org/project/mediapipe/0.10.21/#mediapipe-0.10.21-cp312-cp312-win_amd64.whl
 https://www.python.org/downloads/release/python-31210/
+
+
+https://univrm.com/
+VRM 1.0
+<!-- 
+Unity Registry
+Animation Rigging -->
