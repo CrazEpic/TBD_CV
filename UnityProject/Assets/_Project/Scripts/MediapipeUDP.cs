@@ -7,14 +7,14 @@ using System.Collections.Generic;
 public class MediapipeUDP : MonoBehaviour
 {
     public int port = 5005;
-    public int numJoints = 33;
+    public int numJoints = 75;
 
     private UdpClient udpClient;
     private Thread receiveThread;
     private readonly object lockObject = new();
 
-    // Typed enum for landmarks
-    public enum Landmark
+    // Typed enum for pose landmarks
+    public enum PoseLandmark
     {
         Nose = 0,
         LeftEyeInner = 1, LeftEye = 2, LeftEyeOuter = 3,
@@ -34,12 +34,37 @@ public class MediapipeUDP : MonoBehaviour
         LeftFootIndex = 31, RightFootIndex = 32
     }
 
+    public enum HandLandmark
+    {
+        Wrist = 0, ThumbCMC = 1,
+        ThumbMCP = 2, ThumbIP = 3,
+        ThumbTIP = 4, IndexFingerMCP = 5,
+        IndexFingerPIP = 6, IndexFingerDIP = 7,
+        IndexFingerTIP = 8, MiddleFingerMCP = 9,
+        MiddleFingerPIP = 10, MiddleFingerDIP = 11,
+        MiddleFingerTIP = 12, RingFingerMCP = 13,
+        RingFingerPIP = 14, RingFingerDIP = 15,
+        RingFingerTIP = 16, PinkyMCP = 17,
+        PinkyPIP = 18, PinkyDIP = 19,
+        PinkyTIP = 20 
+    }
+
+
+
     // Dictionary-based landmarks and visibilities
-    public Dictionary<Landmark, Vector3> landmarksDict;
-    public Dictionary<Landmark, float> jointVisibilitiesDict;
+    //public Dictionary<PoseLandmark, Vector3> landmarksDict;
+    public Dictionary<PoseLandmark, Vector3> poseLandmarksDict;
+    public Dictionary<HandLandmark, Vector3> leftHandLandmarksDict;
+    public Dictionary<HandLandmark, Vector3> rightHandLandmarksDict;
+    public Dictionary<PoseLandmark, float> poseVisibilitiesDict;
+    public Dictionary<HandLandmark, float> leftHandVisibilitiesDict;
+    public Dictionary<HandLandmark, float> rightHandVisibilitiesDict;
 
     public GameObject jointPrefab;
-    public Dictionary<Landmark, GameObject> jointObjectsDict;
+    //public Dictionary<Landmark, GameObject> jointObjectsDict;
+    public Dictionary<PoseLandmark, GameObject> poseObjectsDict;
+    public Dictionary<HandLandmark, GameObject> leftHandObjectsDict;
+    public Dictionary<HandLandmark, GameObject> rightHandObjectsDict;
     public Vector3 jointObjectsOffset = Vector3.zero;
 
     public bool flipX = false;
@@ -48,19 +73,47 @@ public class MediapipeUDP : MonoBehaviour
 
     void Start()
     {
-        jointObjectsDict = new Dictionary<Landmark, GameObject>();
-        landmarksDict = new Dictionary<Landmark, Vector3>();
-        jointVisibilitiesDict = new Dictionary<Landmark, float>();
+        poseObjectsDict = new Dictionary<PoseLandmark, GameObject>();
+        poseLandmarksDict = new Dictionary<PoseLandmark, Vector3>();
+        poseVisibilitiesDict = new Dictionary<PoseLandmark, float>();
+
+        leftHandObjectsDict = new Dictionary<HandLandmark, GameObject>();
+        leftHandLandmarksDict = new Dictionary<HandLandmark, Vector3>();
+        leftHandVisibilitiesDict = new Dictionary<HandLandmark, float>();
+
+        rightHandObjectsDict = new Dictionary<HandLandmark, GameObject>();
+        rightHandLandmarksDict = new Dictionary<HandLandmark, Vector3>();
+        rightHandVisibilitiesDict = new Dictionary<HandLandmark, float>();
+
 
         // Initialize dictionaries and GameObjects
-        foreach (Landmark lm in System.Enum.GetValues(typeof(Landmark)))
+        foreach (PoseLandmark lm in System.Enum.GetValues(typeof(PoseLandmark)))
         {
-            landmarksDict[lm] = Vector3.zero;
-            jointVisibilitiesDict[lm] = 0f;
+            poseLandmarksDict[lm] = Vector3.zero;
+            poseVisibilitiesDict[lm] = 0f;
 
             GameObject jointObj = Instantiate(jointPrefab);
             jointObj.name = "Joint_" + lm.ToString();
-            jointObjectsDict[lm] = jointObj;
+            poseObjectsDict[lm] = jointObj;
+        }
+
+        foreach (HandLandmark lm in System.Enum.GetValues(typeof(HandLandmark)))
+        {
+            // left hand
+            leftHandLandmarksDict[lm] = Vector3.zero;
+            leftHandVisibilitiesDict[lm] = 0f;
+
+            GameObject leftHandObj = Instantiate(jointPrefab);
+            leftHandObj.name = "LeftHand_" + lm.ToString();
+            leftHandObjectsDict[lm] = leftHandObj;
+
+            // right hand
+            rightHandLandmarksDict[lm] = Vector3.zero;
+            rightHandVisibilitiesDict[lm] = 0f;
+
+            GameObject rightHandObj = Instantiate(jointPrefab);
+            rightHandObj.name = "rightHand_" + lm.ToString();
+            rightHandObjectsDict[lm] = rightHandObj;
         }
 
         // Start UDP receiver
@@ -86,19 +139,53 @@ public class MediapipeUDP : MonoBehaviour
 
                 lock (lockObject)
                 {
-                    for (int i = 0; i < numJoints; i++)
+                    int index = 0; // each iteration, index will cycle through 4 values from flattened 4 dimensional vector array
+                    // pose
+                    for (int i = 0; i < 33; i++)
                     {
-                        float x = floats[i * 4 + 0];
-                        float y = floats[i * 4 + 1];
-                        float z = floats[i * 4 + 2];
+                        float x = floats[index++];
+                        float y = floats[index++];
+                        float z = floats[index++];
 
                         if (flipX) x = -x;
                         if (flipY) y = -y;
                         if (flipZ) z = -z;
 
-                        Landmark lm = (Landmark)i;
-                        landmarksDict[lm] = new Vector3(x, y, z);
-                        jointVisibilitiesDict[lm] = floats[i * 4 + 3];
+                        PoseLandmark lm = (PoseLandmark)i;
+                        poseLandmarksDict[lm] = new Vector3(x, y, z);
+                        poseVisibilitiesDict[lm] = floats[index++];
+                    }
+
+                    // left hand
+                    for (int i = 0; i < 21; i++)
+                    {
+                        float x = floats[index++];
+                        float y = floats[index++];
+                        float z = floats[index++];
+
+                        if (flipX) x = -x;
+                        if (flipY) y = -y;
+                        if (flipZ) z = -z;
+
+                        HandLandmark lm = (HandLandmark)i;
+                        leftHandLandmarksDict[lm] = new Vector3(x, y, z);
+                        leftHandVisibilitiesDict[lm] = floats[index++];
+                    }
+
+                    // right hand
+                    for (int i = 0; i < 21; i++)
+                    {
+                        float x = floats[index++];
+                        float y = floats[index++];
+                        float z = floats[index++];
+
+                        if (flipX) x = -x;
+                        if (flipY) y = -y;
+                        if (flipZ) z = -z;
+
+                        HandLandmark lm = (HandLandmark)i;
+                        rightHandLandmarksDict[lm] = new Vector3(x, y, z);
+                        rightHandVisibilitiesDict[lm] = floats[index++];
                     }
                 }
             }
@@ -110,14 +197,46 @@ public class MediapipeUDP : MonoBehaviour
     {
         lock (lockObject)
         {
-            foreach (Landmark lm in System.Enum.GetValues(typeof(Landmark)))
+            // foreach (PoseLandmark lm in System.Enum.GetValues(typeof(PoseLandmark)))
+            // {
+            //     GameObject jointObj = poseObjectsDict[lm];
+            //     if (jointObj != null)
+            //     {
+            //         jointObj.transform.position = poseLandmarksDict[lm] + jointObjectsOffset;
+            //     }
+            // }
+
+            // pose
+            foreach (var kv in poseLandmarksDict)
             {
-                GameObject jointObj = jointObjectsDict[lm];
-                if (jointObj != null)
+                PoseLandmark lm = kv.Key;
+
+                if (poseObjectsDict.ContainsKey(lm))
                 {
-                    jointObj.transform.position = landmarksDict[lm] + jointObjectsOffset;
+                    poseObjectsDict[lm].transform.position = kv.Value + jointObjectsOffset;
                 }
             }
+
+            foreach (var kv in leftHandLandmarksDict)
+            {
+                HandLandmark lm = kv.Key;
+
+                if (leftHandObjectsDict.ContainsKey(lm))
+                {
+                    leftHandObjectsDict[lm].transform.position = kv.Value + jointObjectsOffset;
+                }
+            }
+
+            foreach (var kv in rightHandLandmarksDict)
+            {
+                HandLandmark lm = kv.Key;
+
+                if (rightHandObjectsDict.ContainsKey(lm))
+                {
+                    rightHandObjectsDict[lm].transform.position = kv.Value + jointObjectsOffset;
+                }
+            }
+
         }
 
         DrawSkeleton();
@@ -126,53 +245,53 @@ public class MediapipeUDP : MonoBehaviour
     void DrawSkeleton()
     {
         // Head / Face
-        Debug.DrawLine(jointObjectsDict[Landmark.Nose].transform.position, jointObjectsDict[Landmark.LeftEyeInner].transform.position, Color.cyan);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftEyeInner].transform.position, jointObjectsDict[Landmark.LeftEye].transform.position, Color.cyan);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftEye].transform.position, jointObjectsDict[Landmark.LeftEyeOuter].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.Nose].transform.position, poseObjectsDict[PoseLandmark.LeftEyeInner].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftEyeInner].transform.position, poseObjectsDict[PoseLandmark.LeftEye].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftEye].transform.position, poseObjectsDict[PoseLandmark.LeftEyeOuter].transform.position, Color.cyan);
 
-        Debug.DrawLine(jointObjectsDict[Landmark.Nose].transform.position, jointObjectsDict[Landmark.RightEyeInner].transform.position, Color.red);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightEyeInner].transform.position, jointObjectsDict[Landmark.RightEye].transform.position, Color.red);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightEye].transform.position, jointObjectsDict[Landmark.RightEyeOuter].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.Nose].transform.position, poseObjectsDict[PoseLandmark.RightEyeInner].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightEyeInner].transform.position, poseObjectsDict[PoseLandmark.RightEye].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightEye].transform.position, poseObjectsDict[PoseLandmark.RightEyeOuter].transform.position, Color.red);
 
-        Debug.DrawLine(jointObjectsDict[Landmark.Nose].transform.position, jointObjectsDict[Landmark.MouthLeft].transform.position, Color.cyan);
-        Debug.DrawLine(jointObjectsDict[Landmark.Nose].transform.position, jointObjectsDict[Landmark.MouthRight].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.Nose].transform.position, poseObjectsDict[PoseLandmark.MouthLeft].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.Nose].transform.position, poseObjectsDict[PoseLandmark.MouthRight].transform.position, Color.red);
 
         // Shoulders & Arms
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftShoulder].transform.position, jointObjectsDict[Landmark.LeftElbow].transform.position, Color.cyan);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftElbow].transform.position, jointObjectsDict[Landmark.LeftWrist].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftShoulder].transform.position, poseObjectsDict[PoseLandmark.LeftElbow].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftElbow].transform.position, poseObjectsDict[PoseLandmark.LeftWrist].transform.position, Color.cyan);
 
-        Debug.DrawLine(jointObjectsDict[Landmark.RightShoulder].transform.position, jointObjectsDict[Landmark.RightElbow].transform.position, Color.red);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightElbow].transform.position, jointObjectsDict[Landmark.RightWrist].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightShoulder].transform.position, poseObjectsDict[PoseLandmark.RightElbow].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightElbow].transform.position, poseObjectsDict[PoseLandmark.RightWrist].transform.position, Color.red);
 
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftShoulder].transform.position, jointObjectsDict[Landmark.RightShoulder].transform.position, Color.yellow);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftShoulder].transform.position, poseObjectsDict[PoseLandmark.RightShoulder].transform.position, Color.yellow);
 
         // Hands / Fingers
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftWrist].transform.position, jointObjectsDict[Landmark.LeftPinky].transform.position, Color.blue);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftWrist].transform.position, jointObjectsDict[Landmark.LeftIndex].transform.position, Color.blue);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftWrist].transform.position, jointObjectsDict[Landmark.LeftThumb].transform.position, Color.blue);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftWrist].transform.position, poseObjectsDict[PoseLandmark.LeftPinky].transform.position, Color.blue);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftWrist].transform.position, poseObjectsDict[PoseLandmark.LeftIndex].transform.position, Color.blue);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftWrist].transform.position, poseObjectsDict[PoseLandmark.LeftThumb].transform.position, Color.blue);
 
-        Debug.DrawLine(jointObjectsDict[Landmark.RightWrist].transform.position, jointObjectsDict[Landmark.RightPinky].transform.position, Color.magenta);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightWrist].transform.position, jointObjectsDict[Landmark.RightIndex].transform.position, Color.magenta);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightWrist].transform.position, jointObjectsDict[Landmark.RightThumb].transform.position, Color.magenta);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightWrist].transform.position, poseObjectsDict[PoseLandmark.RightPinky].transform.position, Color.magenta);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightWrist].transform.position, poseObjectsDict[PoseLandmark.RightIndex].transform.position, Color.magenta);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightWrist].transform.position, poseObjectsDict[PoseLandmark.RightThumb].transform.position, Color.magenta);
 
         // Torso
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftShoulder].transform.position, jointObjectsDict[Landmark.LeftHip].transform.position, Color.cyan);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightShoulder].transform.position, jointObjectsDict[Landmark.RightHip].transform.position, Color.red);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftHip].transform.position, jointObjectsDict[Landmark.RightHip].transform.position, Color.yellow);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftShoulder].transform.position, poseObjectsDict[PoseLandmark.LeftHip].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightShoulder].transform.position, poseObjectsDict[PoseLandmark.RightHip].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftHip].transform.position, poseObjectsDict[PoseLandmark.RightHip].transform.position, Color.yellow);
 
         // Legs
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftHip].transform.position, jointObjectsDict[Landmark.LeftKnee].transform.position, Color.cyan);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftKnee].transform.position, jointObjectsDict[Landmark.LeftAnkle].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftHip].transform.position, poseObjectsDict[PoseLandmark.LeftKnee].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftKnee].transform.position, poseObjectsDict[PoseLandmark.LeftAnkle].transform.position, Color.cyan);
 
-        Debug.DrawLine(jointObjectsDict[Landmark.RightHip].transform.position, jointObjectsDict[Landmark.RightKnee].transform.position, Color.red);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightKnee].transform.position, jointObjectsDict[Landmark.RightAnkle].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightHip].transform.position, poseObjectsDict[PoseLandmark.RightKnee].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightKnee].transform.position, poseObjectsDict[PoseLandmark.RightAnkle].transform.position, Color.red);
 
         // Feet
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftAnkle].transform.position, jointObjectsDict[Landmark.LeftHeel].transform.position, Color.cyan);
-        Debug.DrawLine(jointObjectsDict[Landmark.LeftAnkle].transform.position, jointObjectsDict[Landmark.LeftFootIndex].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftAnkle].transform.position, poseObjectsDict[PoseLandmark.LeftHeel].transform.position, Color.cyan);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.LeftAnkle].transform.position, poseObjectsDict[PoseLandmark.LeftFootIndex].transform.position, Color.cyan);
 
-        Debug.DrawLine(jointObjectsDict[Landmark.RightAnkle].transform.position, jointObjectsDict[Landmark.RightHeel].transform.position, Color.red);
-        Debug.DrawLine(jointObjectsDict[Landmark.RightAnkle].transform.position, jointObjectsDict[Landmark.RightFootIndex].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightAnkle].transform.position, poseObjectsDict[PoseLandmark.RightHeel].transform.position, Color.red);
+        Debug.DrawLine(poseObjectsDict[PoseLandmark.RightAnkle].transform.position, poseObjectsDict[PoseLandmark.RightFootIndex].transform.position, Color.red);
     }
 
     void OnApplicationQuit()

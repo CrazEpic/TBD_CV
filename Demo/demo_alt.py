@@ -60,16 +60,34 @@ with holistic.Holistic(
             landmark_drawing_spec=drawing_styles.get_default_pose_landmarks_style(),
         )
 
+        # pose (0 - 32)
         if results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
             # landmarks = results.pose_world_landmarks.landmark
             joints = [[lm.x, lm.y, lm.z, lm.visibility] for lm in landmarks]
+        else:
+            joints = [[0,0,0,0]] * 33
             
-            joints_array = np.array(joints, dtype=np.float32)
-            data_flat = joints_array.flatten()
+        # left hand (33 - 53)
+        if results.left_hand_landmarks:
+            for lm in results.left_hand_landmarks.landmark:
+                joints.append([lm.x, lm.y, lm.z, 1.0])
+        else:
+            joints += [[0,0,0,0]] * 21
 
-            data_bytes = struct.pack(f'{len(data_flat)}f', *data_flat)
-            sock.sendto(data_bytes, (UDP_IP, UDP_PORT))
+        # right hand (54 - 74)
+        if results.right_hand_landmarks:
+            for lm in results.right_hand_landmarks.landmark:
+                joints.append([lm.x, lm.y, lm.z, 1.0])
+        else:
+            joints += [[0,0,0,0]] * 21
+        
+        # sending all landmarks
+        joints_array = np.array(joints, dtype=np.float32)
+        data_flat = joints_array.flatten()
+
+        data_bytes = struct.pack(f'{len(data_flat)}f', *data_flat)
+        sock.sendto(data_bytes, (UDP_IP, UDP_PORT))
 
         # Flip the image horizontally for a selfie-view display.
         cv2.imshow("MediaPipe Holistic", cv2.flip(image, 1))

@@ -16,9 +16,9 @@ public class AvatarController : MonoBehaviour
         ApplyLegs();
     }
 
-    Vector3 L(MediapipeUDP.Landmark l)
+    Vector3 L(MediapipeUDP.PoseLandmark l)
     {
-        return InstanceManager.Instance.mediapipeUDP.landmarksDict[l];
+        return InstanceManager.Instance.mediapipeUDP.poseLandmarksDict[l];
     }
 
     void ApplyTorso()
@@ -28,10 +28,10 @@ public class AvatarController : MonoBehaviour
         Transform chest = animator.GetBoneTransform(HumanBodyBones.Chest);
         Transform upperChest = animator.GetBoneTransform(HumanBodyBones.UpperChest);
 
-        Vector3 leftHip = L(MediapipeUDP.Landmark.LeftHip);
-        Vector3 rightHip = L(MediapipeUDP.Landmark.RightHip);
-        Vector3 leftShoulder = L(MediapipeUDP.Landmark.LeftShoulder);
-        Vector3 rightShoulder = L(MediapipeUDP.Landmark.RightShoulder);
+        Vector3 leftHip = L(MediapipeUDP.PoseLandmark.LeftHip);
+        Vector3 rightHip = L(MediapipeUDP.PoseLandmark.RightHip);
+        Vector3 leftShoulder = L(MediapipeUDP.PoseLandmark.LeftShoulder);
+        Vector3 rightShoulder = L(MediapipeUDP.PoseLandmark.RightShoulder);
 
         // Centers
         Vector3 hipCenter = (leftHip + rightHip) * 0.5f;
@@ -83,16 +83,16 @@ public class AvatarController : MonoBehaviour
         Transform leftUpperArm = animator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
         Transform leftLowerArm = animator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
         Transform leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
-        ApplyRotation(leftUpperArm, -leftUpperArm.right, L(MediapipeUDP.Landmark.RightElbow) - L(MediapipeUDP.Landmark.RightShoulder));
-        ApplyRotation(leftLowerArm, -leftLowerArm.right, L(MediapipeUDP.Landmark.RightWrist) - L(MediapipeUDP.Landmark.RightElbow));
-        ApplyRotation(leftHand, -leftHand.right, L(MediapipeUDP.Landmark.RightIndex) - L(MediapipeUDP.Landmark.RightWrist));
+        ApplyRotation(leftUpperArm, -leftUpperArm.right, L(MediapipeUDP.PoseLandmark.RightElbow) - L(MediapipeUDP.PoseLandmark.RightShoulder));
+        ApplyRotation(leftLowerArm, -leftLowerArm.right, L(MediapipeUDP.PoseLandmark.RightWrist) - L(MediapipeUDP.PoseLandmark.RightElbow));
+        ApplyRotation(leftHand, -leftHand.right, L(MediapipeUDP.PoseLandmark.RightIndex) - L(MediapipeUDP.PoseLandmark.RightWrist));
 
         Transform rightUpperArm = animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
         Transform rightLowerArm = animator.GetBoneTransform(HumanBodyBones.RightLowerArm);
         Transform rightHand = animator.GetBoneTransform(HumanBodyBones.RightHand);
-        ApplyRotation(rightUpperArm, rightUpperArm.right, L(MediapipeUDP.Landmark.LeftElbow) - L(MediapipeUDP.Landmark.LeftShoulder));
-        ApplyRotation(rightLowerArm, rightLowerArm.right, L(MediapipeUDP.Landmark.LeftWrist) - L(MediapipeUDP.Landmark.LeftElbow));
-        ApplyRotation(rightHand, rightHand.right, L(MediapipeUDP.Landmark.LeftIndex) - L(MediapipeUDP.Landmark.LeftWrist));
+        ApplyRotation(rightUpperArm, rightUpperArm.right, L(MediapipeUDP.PoseLandmark.LeftElbow) - L(MediapipeUDP.PoseLandmark.LeftShoulder));
+        ApplyRotation(rightLowerArm, rightLowerArm.right, L(MediapipeUDP.PoseLandmark.LeftWrist) - L(MediapipeUDP.PoseLandmark.LeftElbow));
+        ApplyRotation(rightHand, rightHand.right, L(MediapipeUDP.PoseLandmark.LeftIndex) - L(MediapipeUDP.PoseLandmark.LeftWrist));
     }
 
     void ApplyLegs()
@@ -100,15 +100,15 @@ public class AvatarController : MonoBehaviour
         Transform leftUpperLeg = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
         Transform leftLowerLeg = animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
         Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
-        ApplyRotation(leftUpperLeg, -leftUpperLeg.up, L(MediapipeUDP.Landmark.RightKnee) - L(MediapipeUDP.Landmark.RightHip));
-        ApplyRotation(leftLowerLeg, -leftLowerLeg.up, L(MediapipeUDP.Landmark.RightAnkle) - L(MediapipeUDP.Landmark.RightKnee));
-        ApplyRotation(leftFoot, leftFoot.forward, L(MediapipeUDP.Landmark.RightFootIndex) - L(MediapipeUDP.Landmark.RightAnkle));
+        ApplyRotation(leftUpperLeg, -leftUpperLeg.up, L(MediapipeUDP.PoseLandmark.RightKnee) - L(MediapipeUDP.PoseLandmark.RightHip));
+        ApplyRotation(leftLowerLeg, -leftLowerLeg.up, L(MediapipeUDP.PoseLandmark.RightAnkle) - L(MediapipeUDP.PoseLandmark.RightKnee));
+        ApplyRotation(leftFoot, leftFoot.forward, L(MediapipeUDP.PoseLandmark.RightFootIndex) - L(MediapipeUDP.PoseLandmark.RightAnkle));
 
         Transform rightUpperLeg = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
         Transform rightLowerLeg = animator.GetBoneTransform(HumanBodyBones.RightLowerLeg);
         Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
-        ApplyRotation(rightUpperLeg, -rightUpperLeg.up, L(MediapipeUDP.Landmark.LeftKnee) - L(MediapipeUDP.Landmark.LeftHip));
-        ApplyRotation(rightLowerLeg, -rightLowerLeg.up, L(MediapipeUDP.Landmark.LeftAnkle) - L(MediapipeUDP.Landmark.LeftKnee));
-        ApplyRotation(rightFoot, rightFoot.forward, L(MediapipeUDP.Landmark.LeftFootIndex) - L(MediapipeUDP.Landmark.LeftAnkle));
+        ApplyRotation(rightUpperLeg, -rightUpperLeg.up, L(MediapipeUDP.PoseLandmark.LeftKnee) - L(MediapipeUDP.PoseLandmark.LeftHip));
+        ApplyRotation(rightLowerLeg, -rightLowerLeg.up, L(MediapipeUDP.PoseLandmark.LeftAnkle) - L(MediapipeUDP.PoseLandmark.LeftKnee));
+        ApplyRotation(rightFoot, rightFoot.forward, L(MediapipeUDP.PoseLandmark.LeftFootIndex) - L(MediapipeUDP.PoseLandmark.LeftAnkle));
     }
 }
