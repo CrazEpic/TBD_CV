@@ -126,6 +126,11 @@ public class AvatarController : MonoBehaviour
         // Transform leftThumbIntermediate = animator.GetBoneTransform(HumanBodyBones.LeftThumbIntermediate);
         // Transform leftThumbDistal = animator.GetBoneTransform(HumanBodyBones.LeftThumbDistal);
 
+        // left thumb
+        // LEFT THUMB HERE
+
+        
+        // left index
         Transform leftIndexProximal = animator.GetBoneTransform(HumanBodyBones.LeftIndexProximal);
         Transform leftIndexIntermediate = animator.GetBoneTransform(HumanBodyBones.LeftIndexIntermediate);
         Transform leftIndexDistal = animator.GetBoneTransform(HumanBodyBones.LeftIndexDistal);
@@ -133,6 +138,72 @@ public class AvatarController : MonoBehaviour
         ApplyRotation(leftIndexProximal, -leftIndexProximal.right, H(MediapipeUDP.HandLandmark.IndexFingerPIP) - H(MediapipeUDP.HandLandmark.IndexFingerMCP));
         ApplyRotation(leftIndexIntermediate, -leftIndexIntermediate.right, H(MediapipeUDP.HandLandmark.IndexFingerDIP) - H(MediapipeUDP.HandLandmark.IndexFingerPIP));
         ApplyRotation(leftIndexDistal, -leftIndexDistal.right, H(MediapipeUDP.HandLandmark.IndexFingerTIP) - H(MediapipeUDP.HandLandmark.IndexFingerDIP));
+
+        // left middle
+        Transform leftMiddleProximal = animator.GetBoneTransform(HumanBodyBones.LeftMiddleProximal);
+        Transform leftMiddleIntermediate = animator.GetBoneTransform(HumanBodyBones.LeftMiddleIntermediate);
+        Transform leftMiddleDistal = animator.GetBoneTransform(HumanBodyBones.LeftMiddleDistal);
+
+        ApplyRotation(leftMiddleProximal, -leftMiddleProximal.right, H(MediapipeUDP.HandLandmark.MiddleFingerPIP) - H(MediapipeUDP.HandLandmark.MiddleFingerMCP));
+        ApplyRotation(leftMiddleIntermediate, -leftMiddleIntermediate.right, H(MediapipeUDP.HandLandmark.MiddleFingerDIP) - H(MediapipeUDP.HandLandmark.MiddleFingerPIP));
+        ApplyRotation(leftMiddleDistal, -leftMiddleDistal.right, H(MediapipeUDP.HandLandmark.MiddleFingerTIP) - H(MediapipeUDP.HandLandmark.MiddleFingerDIP));
+
+        // left ring
+        Transform leftRingProximal = animator.GetBoneTransform(HumanBodyBones.LeftRingProximal);
+        Transform leftRingIntermediate = animator.GetBoneTransform(HumanBodyBones.LeftRingIntermediate);
+        Transform leftRingDistal = animator.GetBoneTransform(HumanBodyBones.LeftRingDistal);
+
+        ApplyRotation(leftRingProximal, -leftRingProximal.right, H(MediapipeUDP.HandLandmark.RingFingerPIP) - H(MediapipeUDP.HandLandmark.RingFingerMCP));
+        ApplyRotation(leftRingIntermediate, -leftRingIntermediate.right, H(MediapipeUDP.HandLandmark.RingFingerDIP) - H(MediapipeUDP.HandLandmark.RingFingerPIP));
+        ApplyRotation(leftRingDistal, -leftRingDistal.right, H(MediapipeUDP.HandLandmark.RingFingerTIP) - H(MediapipeUDP.HandLandmark.RingFingerDIP));
+
+        // left pinky
+        Transform leftLittleProximal = animator.GetBoneTransform(HumanBodyBones.LeftLittleProximal);
+        Transform leftLittleIntermediate = animator.GetBoneTransform(HumanBodyBones.LeftLittleIntermediate);
+        Transform leftLittleDistal = animator.GetBoneTransform(HumanBodyBones.LeftLittleDistal);
+
+        ApplyRotation(leftLittleProximal, -leftLittleProximal.right, H(MediapipeUDP.HandLandmark.PinkyPIP) - H(MediapipeUDP.HandLandmark.PinkyMCP));
+        ApplyRotation(leftLittleIntermediate, -leftLittleIntermediate.right, H(MediapipeUDP.HandLandmark.PinkyDIP) - H(MediapipeUDP.HandLandmark.PinkyPIP));
+        ApplyRotation(leftLittleDistal, -leftLittleDistal.right, H(MediapipeUDP.HandLandmark.PinkyTIP) - H(MediapipeUDP.HandLandmark.PinkyDIP));
+
+        // right thumb
+        // RIGHT THUMB HERE
+
+        // right index
+        Transform rightIndexProximal = animator.GetBoneTransform(HumanBodyBones.RightIndexProximal);
+        Transform rightIndexIntermediate = animator.GetBoneTransform(HumanBodyBones.RightIndexIntermediate);
+        Transform rightIndexDistal = animator.GetBoneTransform(HumanBodyBones.RightIndexDistal);
+
+        ApplyRotation(rightIndexProximal, rightIndexProximal.right, H(MediapipeUDP.HandLandmark.IndexFingerPIP, false) - H(MediapipeUDP.HandLandmark.IndexFingerMCP, false));
+        ApplyRotation(rightIndexIntermediate, rightIndexIntermediate.right, H(MediapipeUDP.HandLandmark.IndexFingerDIP, false) - H(MediapipeUDP.HandLandmark.IndexFingerPIP, false));
+        ApplyRotation(rightIndexDistal, rightIndexDistal.right, H(MediapipeUDP.HandLandmark.IndexFingerTIP, false) - H(MediapipeUDP.HandLandmark.IndexFingerDIP, false));
+
+        // right middle
+        Transform rightMiddleProximal = animator.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
+        Transform rightMiddleIntermediate = animator.GetBoneTransform(HumanBodyBones.RightMiddleIntermediate);
+        Transform rightMiddleDistal = animator.GetBoneTransform(HumanBodyBones.RightMiddleDistal);
+
+        ApplyRotation(rightMiddleProximal, rightMiddleProximal.right, H(MediapipeUDP.HandLandmark.MiddleFingerPIP, false) - H(MediapipeUDP.HandLandmark.MiddleFingerMCP, false));
+        ApplyRotation(rightMiddleIntermediate, rightMiddleIntermediate.right, H(MediapipeUDP.HandLandmark.MiddleFingerDIP, false) - H(MediapipeUDP.HandLandmark.MiddleFingerPIP, false));
+        ApplyRotation(rightMiddleDistal, rightMiddleDistal.right, H(MediapipeUDP.HandLandmark.MiddleFingerTIP, false) - H(MediapipeUDP.HandLandmark.MiddleFingerDIP, false));
+
+        // right ring
+        Transform rightRingProximal = animator.GetBoneTransform(HumanBodyBones.RightRingProximal);
+        Transform rightRingIntermediate = animator.GetBoneTransform(HumanBodyBones.RightRingIntermediate);
+        Transform rightRingDistal = animator.GetBoneTransform(HumanBodyBones.RightRingDistal);
+
+        ApplyRotation(rightRingProximal, rightRingProximal.right, H(MediapipeUDP.HandLandmark.RingFingerPIP, false) - H(MediapipeUDP.HandLandmark.RingFingerMCP, false));
+        ApplyRotation(rightRingIntermediate, rightRingIntermediate.right, H(MediapipeUDP.HandLandmark.RingFingerDIP, false) - H(MediapipeUDP.HandLandmark.RingFingerPIP, false));
+        ApplyRotation(rightRingDistal, rightRingDistal.right, H(MediapipeUDP.HandLandmark.RingFingerTIP, false) - H(MediapipeUDP.HandLandmark.RingFingerDIP, false));
+
+        // right pinky
+        Transform rightLittleProximal = animator.GetBoneTransform(HumanBodyBones.RightLittleProximal);
+        Transform rightLittleIntermediate = animator.GetBoneTransform(HumanBodyBones.RightLittleIntermediate);
+        Transform rightLittleDistal = animator.GetBoneTransform(HumanBodyBones.RightLittleDistal);
+
+        ApplyRotation(rightLittleProximal, rightLittleProximal.right, H(MediapipeUDP.HandLandmark.PinkyPIP, false) - H(MediapipeUDP.HandLandmark.PinkyMCP, false));
+        ApplyRotation(rightLittleIntermediate, rightLittleIntermediate.right, H(MediapipeUDP.HandLandmark.PinkyDIP, false) - H(MediapipeUDP.HandLandmark.PinkyPIP, false));
+        ApplyRotation(rightLittleDistal, rightLittleDistal.right, H(MediapipeUDP.HandLandmark.PinkyTIP, false) - H(MediapipeUDP.HandLandmark.PinkyDIP, false));
 
         // Transform leftUpperArm = animator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
         // Transform leftLowerArm = animator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
