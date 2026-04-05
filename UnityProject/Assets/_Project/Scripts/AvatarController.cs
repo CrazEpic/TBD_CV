@@ -128,8 +128,14 @@ public class AvatarController : MonoBehaviour
 
         // left thumb
         // LEFT THUMB HERE
+        Transform leftThumbProximal = animator.GetBoneTransform(HumanBodyBones.LeftThumbProximal);
+        Transform leftThumbIntermediate = animator.GetBoneTransform(HumanBodyBones.LeftThumbIntermediate);
+        Transform leftThumbDistal = animator.GetBoneTransform(HumanBodyBones.LeftThumbDistal);
 
-        
+        ApplyRotation(leftThumbProximal, -leftThumbProximal.right + leftThumbProximal.forward, H(MediapipeUDP.HandLandmark.ThumbMCP) - H(MediapipeUDP.HandLandmark.ThumbCMC));
+        ApplyRotation(leftThumbIntermediate, -leftThumbIntermediate.right + leftThumbIntermediate.forward, H(MediapipeUDP.HandLandmark.ThumbIP) - H(MediapipeUDP.HandLandmark.ThumbMCP));
+        ApplyRotation(leftThumbDistal, -leftThumbDistal.right + leftThumbDistal.forward, H(MediapipeUDP.HandLandmark.ThumbTIP) - H(MediapipeUDP.HandLandmark.ThumbIP));
+
         // left index
         Transform leftIndexProximal = animator.GetBoneTransform(HumanBodyBones.LeftIndexProximal);
         Transform leftIndexIntermediate = animator.GetBoneTransform(HumanBodyBones.LeftIndexIntermediate);
