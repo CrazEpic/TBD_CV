@@ -6,6 +6,7 @@ public class AvatarController : MonoBehaviour
 
     public bool debugMode = false;
     public float smoothFactor = 15f;
+    public float playingModeConstraintWeight = 0.95f;
 
     void LateUpdate()
     {
@@ -15,18 +16,29 @@ public class AvatarController : MonoBehaviour
         // ApplyArms();
         // ApplyLegs();
         ApplyHands();
+        ApplyInstrumentConstraints();
     }
 
     Vector3 L(MediapipeUDP.PoseLandmark l)
     {
-        return InstanceManager.Instance.mediapipeUDP.poseLandmarksDict[l];
+        MediapipeUDP udp = InstanceManager.Instance.mediapipeUDP;
+        string key = $"pose_{(int)l}";
+        if (udp.hybridJointPositions.TryGetValue(key, out Vector3 p))
+        {
+            return p;
+        }
+        return Vector3.zero;
     }
 
     Vector3 H(MediapipeUDP.HandLandmark h, bool left = true)
     {
-        return (left) ?
-            InstanceManager.Instance.mediapipeUDP.leftHandLandmarksDict[h] :
-            InstanceManager.Instance.mediapipeUDP.rightHandLandmarksDict[h];
+        MediapipeUDP udp = InstanceManager.Instance.mediapipeUDP;
+        string key = left ? $"left_{(int)h}" : $"right_{(int)h}";
+        if (udp.hybridJointPositions.TryGetValue(key, out Vector3 p))
+        {
+            return p;
+        }
+        return Vector3.zero;
     }
 
     void ApplyTorso()
@@ -84,6 +96,63 @@ public class AvatarController : MonoBehaviour
         // Apply the rotation
         // bone.rotation = targetRotation;
         bone.rotation = Quaternion.Slerp(bone.rotation, targetRotation, Time.deltaTime * smoothFactor);
+    }
+
+    void ApplyRotationWeighted(Transform bone, Vector3 boneAxisToAlign, Vector3 targetDirection, float weight)
+    {
+        if (targetDirection.sqrMagnitude < 0.0001f || weight <= 0.001f) return;
+
+        targetDirection.Normalize();
+        Quaternion targetRotation = Quaternion.FromToRotation(boneAxisToAlign, targetDirection) * bone.rotation;
+
+        float factor = Time.deltaTime * smoothFactor * Mathf.Clamp01(weight);
+        bone.rotation = Quaternion.Slerp(bone.rotation, targetRotation, factor);
+    }
+
+    void ApplyBoneTowardTarget(HumanBodyBones boneId, Vector3 axis, Vector3 target, float weight)
+    {
+        Transform bone = animator.GetBoneTransform(boneId);
+        if (bone == null) return;
+        Vector3 dir = target - bone.position;
+        ApplyRotationWeighted(bone, axis, dir, weight);
+    }
+
+    void ApplyInstrumentConstraints()
+    {
+        MediapipeUDP udp = InstanceManager.Instance.mediapipeUDP;
+        if (!udp.hybridStateValid) return;
+        ApplyHybridInstrumentConstraints(udp);
+    }
+
+    void ApplyHybridInstrumentConstraints(MediapipeUDP udp)
+    {
+        if (udp.instrumentConfidence < 0.05f) return;
+
+        Vector3 axis = udp.instrumentAxis.sqrMagnitude > 1e-8f ? udp.instrumentAxis.normalized : Vector3.right;
+        Vector3 up = udp.instrumentUp.sqrMagnitude > 1e-8f ? udp.instrumentUp.normalized : Vector3.up;
+        Vector3 center = udp.instrumentCenter;
+
+        float weight = Mathf.Clamp01(playingModeConstraintWeight * udp.instrumentConfidence);
+        Vector3 leftTarget = center - axis * 0.12f;
+        Vector3 rightTarget = center + axis * 0.24f;
+        Vector3 headTarget = center + up * 0.10f;
+
+        Transform leftHandBone = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+        Transform rightHandBone = animator.GetBoneTransform(HumanBodyBones.RightHand);
+        Transform headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+
+        if (leftHandBone != null)
+        {
+            ApplyBoneTowardTarget(HumanBodyBones.LeftHand, -leftHandBone.right, leftTarget, weight);
+        }
+        if (rightHandBone != null)
+        {
+            ApplyBoneTowardTarget(HumanBodyBones.RightHand, rightHandBone.right, rightTarget, weight);
+        }
+        if (headBone != null)
+        {
+            ApplyBoneTowardTarget(HumanBodyBones.Head, headBone.forward, headTarget, weight * 0.75f);
+        }
     }
 
     void ApplyArms()

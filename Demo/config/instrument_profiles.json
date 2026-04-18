@@ -1,0 +1,30 @@
+{
+  "profiles": {
+    "flute": {
+      "key_centers": {
+        "hole1": [-0.03, 0.0, 0.015],
+        "hole2": [0.015, 0.0, 0.01],
+        "hole3": [0.06, 0.0, 0.008],
+        "hole4": [0.125, 0.0, -0.004],
+        "hole5": [0.175, 0.0, -0.007],
+        "hole6": [0.235, 0.0, -0.01]
+      },
+      "key_radius": 0.038,
+      "key_on_threshold": 0.62,
+      "key_off_threshold": 0.42,
+      "key_hold_frames": 2
+    },
+    "violin": {
+      "string_centers": {
+        "G": 0.03,
+        "D": 0.01,
+        "A": -0.01,
+        "E": -0.03
+      },
+      "string_width": 0.018,
+      "position_bins": [0.03, 0.08, 0.13, 0.18],
+      "bow_pressure_center_y": -0.12,
+      "bow_pressure_half_width": 0.08
+    }
+  }
+}

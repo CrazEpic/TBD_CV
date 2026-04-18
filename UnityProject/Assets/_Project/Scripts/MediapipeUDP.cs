@@ -1,8 +1,11 @@
 using UnityEngine;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Collections.Generic;
+using System.Collections;
+using System.Text;
 
 public class MediapipeUDP : MonoBehaviour
 {
@@ -59,6 +62,16 @@ public class MediapipeUDP : MonoBehaviour
     public Dictionary<PoseLandmark, float> poseVisibilitiesDict;
     public Dictionary<HandLandmark, float> leftHandVisibilitiesDict;
     public Dictionary<HandLandmark, float> rightHandVisibilitiesDict;
+    public Vector3 instrumentCenter;
+    public Vector3 instrumentAxis;
+    public Vector3 instrumentUp;
+    public float instrumentConfidence;
+
+    public bool hybridStateValid;
+    public Dictionary<string, Vector3> hybridJointPositions;
+    public Dictionary<string, Quaternion> hybridJointRotations;
+    public Dictionary<string, float> hybridJointConfidences;
+    public Dictionary<string, float> hybridContactErrors;
 
     public GameObject jointPrefab;
     //public Dictionary<Landmark, GameObject> jointObjectsDict;
@@ -84,6 +97,17 @@ public class MediapipeUDP : MonoBehaviour
         rightHandObjectsDict = new Dictionary<HandLandmark, GameObject>();
         rightHandLandmarksDict = new Dictionary<HandLandmark, Vector3>();
         rightHandVisibilitiesDict = new Dictionary<HandLandmark, float>();
+
+        instrumentCenter = Vector3.zero;
+        instrumentAxis = Vector3.zero;
+        instrumentUp = Vector3.zero;
+        instrumentConfidence = 0f;
+
+        hybridStateValid = false;
+        hybridJointPositions = new Dictionary<string, Vector3>();
+        hybridJointRotations = new Dictionary<string, Quaternion>();
+        hybridJointConfidences = new Dictionary<string, float>();
+        hybridContactErrors = new Dictionary<string, float>();
 
 
         // Initialize dictionaries and GameObjects
@@ -133,64 +157,251 @@ public class MediapipeUDP : MonoBehaviour
             try
             {
                 byte[] data = udpClient.Receive(ref remoteEndPoint);
-                float[] floats = new float[data.Length / 4];
-                for (int i = 0; i < floats.Length; i++)
-                    floats[i] = System.BitConverter.ToSingle(data, i * 4);
+
+                if (!LooksLikeJson(data))
+                {
+                    continue;
+                }
 
                 lock (lockObject)
                 {
-                    int index = 0; // each iteration, index will cycle through 4 values from flattened 4 dimensional vector array
-                    // pose
-                    for (int i = 0; i < 33; i++)
-                    {
-                        float x = floats[index++];
-                        float y = floats[index++];
-                        float z = floats[index++];
-
-                        if (flipX) x = -x;
-                        if (flipY) y = -y;
-                        if (flipZ) z = -z;
-
-                        PoseLandmark lm = (PoseLandmark)i;
-                        poseLandmarksDict[lm] = new Vector3(x, y, z);
-                        poseVisibilitiesDict[lm] = floats[index++];
-                    }
-
-                    // left hand
-                    for (int i = 0; i < 21; i++)
-                    {
-                        float x = floats[index++];
-                        float y = floats[index++];
-                        float z = floats[index++];
-
-                        if (flipX) x = -x;
-                        if (flipY) y = -y;
-                        if (flipZ) z = -z;
-
-                        HandLandmark lm = (HandLandmark)i;
-                        leftHandLandmarksDict[lm] = new Vector3(x, y, z);
-                        leftHandVisibilitiesDict[lm] = floats[index++];
-                    }
-
-                    // right hand
-                    for (int i = 0; i < 21; i++)
-                    {
-                        float x = floats[index++];
-                        float y = floats[index++];
-                        float z = floats[index++];
-
-                        if (flipX) x = -x;
-                        if (flipY) y = -y;
-                        if (flipZ) z = -z;
-
-                        HandLandmark lm = (HandLandmark)i;
-                        rightHandLandmarksDict[lm] = new Vector3(x, y, z);
-                        rightHandVisibilitiesDict[lm] = floats[index++];
-                    }
+                    ParseHybridJsonPacket(data);
                 }
             }
             catch { }
         }
+    }
+
+    bool LooksLikeJson(byte[] data)
+    {
+        if (data == null || data.Length == 0) return false;
+        byte b = data[0];
+        return b == (byte)'{' || b == (byte)'[';
+    }
+
+    void ParseHybridJsonPacket(byte[] data)
+    {
+        string text = Encoding.UTF8.GetString(data);
+        object rootObj = MiniJSON.Deserialize(text);
+        if (!(rootObj is Dictionary<string, object> root))
+        {
+            return;
+        }
+
+        if (!root.TryGetValue("type", out object typeObj))
+        {
+            return;
+        }
+        if (!string.Equals(typeObj as string, "hybrid_state_v2", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (!TryGetDict(root, "data", out Dictionary<string, object> dataDict))
+        {
+            return;
+        }
+
+        hybridStateValid = true;
+
+        if (TryGetDict(dataDict, "human_joints", out Dictionary<string, object> humanJoints))
+        {
+            ParseHumanJoints(humanJoints);
+        }
+
+        if (TryGetDict(dataDict, "instrument", out Dictionary<string, object> instrumentDict))
+        {
+            ParseInstrumentState(instrumentDict);
+        }
+
+        if (TryGetDict(dataDict, "contacts", out Dictionary<string, object> contactsDict))
+        {
+            hybridContactErrors.Clear();
+            foreach (var kv in contactsDict)
+            {
+                if (TryToFloat(kv.Value, out float v))
+                {
+                    hybridContactErrors[kv.Key] = v;
+                }
+            }
+        }
+    }
+
+    void ParseHumanJoints(Dictionary<string, object> humanJoints)
+    {
+        hybridJointPositions.Clear();
+        hybridJointRotations.Clear();
+        hybridJointConfidences.Clear();
+
+        foreach (var kv in humanJoints)
+        {
+            if (!(kv.Value is Dictionary<string, object> joint))
+            {
+                continue;
+            }
+
+            if (!TryGetVec3(joint, "position", out Vector3 pos))
+            {
+                continue;
+            }
+
+            if (flipX) pos.x = -pos.x;
+            if (flipY) pos.y = -pos.y;
+            if (flipZ) pos.z = -pos.z;
+
+            Vector4 rot4 = new Vector4(0f, 0f, 0f, 1f);
+            if (TryGetVec4(joint, "rotation", out Vector4 q))
+            {
+                rot4 = q;
+            }
+
+            Quaternion rot = new Quaternion(rot4.x, rot4.y, rot4.z, rot4.w).normalized;
+            if (flipX) rot = new Quaternion(-rot.x, rot.y, rot.z, rot.w);
+            if (flipY) rot = new Quaternion(rot.x, -rot.y, rot.z, rot.w);
+            if (flipZ) rot = new Quaternion(rot.x, rot.y, -rot.z, rot.w);
+
+            float conf = 0f;
+            if (joint.TryGetValue("confidence", out object confObj) && TryToFloat(confObj, out float parsed))
+            {
+                conf = parsed;
+            }
+
+            hybridJointPositions[kv.Key] = pos;
+            hybridJointRotations[kv.Key] = rot;
+            hybridJointConfidences[kv.Key] = conf;
+
+            if (kv.Key.StartsWith("pose_", StringComparison.Ordinal) && int.TryParse(kv.Key.Substring(5), out int poseIndex))
+            {
+                if (poseIndex >= 0 && poseIndex < 33)
+                {
+                    PoseLandmark lm = (PoseLandmark)poseIndex;
+                    poseLandmarksDict[lm] = pos;
+                    poseVisibilitiesDict[lm] = conf;
+                }
+            }
+            else if (kv.Key.StartsWith("left_", StringComparison.Ordinal) && int.TryParse(kv.Key.Substring(5), out int lIndex))
+            {
+                if (lIndex >= 0 && lIndex < 21)
+                {
+                    HandLandmark lm = (HandLandmark)lIndex;
+                    leftHandLandmarksDict[lm] = pos;
+                    leftHandVisibilitiesDict[lm] = conf;
+                }
+            }
+            else if (kv.Key.StartsWith("right_", StringComparison.Ordinal) && int.TryParse(kv.Key.Substring(6), out int rIndex))
+            {
+                if (rIndex >= 0 && rIndex < 21)
+                {
+                    HandLandmark lm = (HandLandmark)rIndex;
+                    rightHandLandmarksDict[lm] = pos;
+                    rightHandVisibilitiesDict[lm] = conf;
+                }
+            }
+        }
+    }
+
+    void ParseInstrumentState(Dictionary<string, object> instrumentDict)
+    {
+        if (TryGetVec3(instrumentDict, "position", out Vector3 pos))
+        {
+            if (flipX) pos.x = -pos.x;
+            if (flipY) pos.y = -pos.y;
+            if (flipZ) pos.z = -pos.z;
+            instrumentCenter = pos;
+        }
+
+        if (TryGetVec4(instrumentDict, "rotation", out Vector4 qv))
+        {
+            Quaternion q = new Quaternion(qv.x, qv.y, qv.z, qv.w).normalized;
+            Vector3 axis = q * Vector3.right;
+            Vector3 up = q * Vector3.up;
+            if (flipX) { axis.x = -axis.x; up.x = -up.x; }
+            if (flipY) { axis.y = -axis.y; up.y = -up.y; }
+            if (flipZ) { axis.z = -axis.z; up.z = -up.z; }
+            instrumentAxis = axis;
+            instrumentUp = up;
+        }
+
+        if (instrumentDict.TryGetValue("confidence", out object confObj) && TryToFloat(confObj, out float conf))
+        {
+            instrumentConfidence = conf;
+        }
+    }
+
+    static bool TryGetDict(Dictionary<string, object> dict, string key, out Dictionary<string, object> outDict)
+    {
+        outDict = null;
+        if (!dict.TryGetValue(key, out object obj)) return false;
+        outDict = obj as Dictionary<string, object>;
+        return outDict != null;
+    }
+
+    static bool TryGetVec3(Dictionary<string, object> dict, string key, out Vector3 v)
+    {
+        v = Vector3.zero;
+        if (!dict.TryGetValue(key, out object obj)) return false;
+        if (!(obj is IList list) || list.Count < 3) return false;
+        if (!TryToFloat(list[0], out float x)) return false;
+        if (!TryToFloat(list[1], out float y)) return false;
+        if (!TryToFloat(list[2], out float z)) return false;
+        v = new Vector3(x, y, z);
+        return true;
+    }
+
+    static bool TryGetVec4(Dictionary<string, object> dict, string key, out Vector4 v)
+    {
+        v = new Vector4(0f, 0f, 0f, 1f);
+        if (!dict.TryGetValue(key, out object obj)) return false;
+        if (!(obj is IList list) || list.Count < 4) return false;
+        if (!TryToFloat(list[0], out float x)) return false;
+        if (!TryToFloat(list[1], out float y)) return false;
+        if (!TryToFloat(list[2], out float z)) return false;
+        if (!TryToFloat(list[3], out float w)) return false;
+        v = new Vector4(x, y, z, w);
+        return true;
+    }
+
+    static bool TryToFloat(object obj, out float value)
+    {
+        value = 0f;
+        if (obj == null) return false;
+        switch (obj)
+        {
+            case float f:
+                value = f;
+                return true;
+            case double d:
+                value = (float)d;
+                return true;
+            case long l:
+                value = l;
+                return true;
+            case int i:
+                value = i;
+                return true;
+            case string s when float.TryParse(s, out float parsed):
+                value = parsed;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public Vector3 WorldToInstrumentLocal(Vector3 world)
+    {
+        if (instrumentConfidence <= 0.01f || instrumentAxis.sqrMagnitude < 1e-8f || instrumentUp.sqrMagnitude < 1e-8f)
+        {
+            return Vector3.zero;
+        }
+
+        Vector3 x = instrumentAxis.normalized;
+        Vector3 y = instrumentUp.normalized;
+        Vector3 z = Vector3.Cross(x, y);
+        if (z.sqrMagnitude < 1e-8f) return Vector3.zero;
+        z.Normalize();
+
+        Vector3 delta = world - instrumentCenter;
+        return new Vector3(Vector3.Dot(delta, x), Vector3.Dot(delta, y), Vector3.Dot(delta, z));
     }
 
     void Update()
@@ -242,6 +453,21 @@ public class MediapipeUDP : MonoBehaviour
                 Vector3 localOffset = kv.Value - wristRHand;
 
                 rightHandObjectsDict[lm].transform.position = wristRPose + localOffset * scale + jointObjectsOffset;
+            }
+
+            if (instrumentConfidence > 0.01f)
+            {
+                Debug.DrawLine(
+                    instrumentCenter + jointObjectsOffset,
+                    instrumentCenter + instrumentAxis.normalized * 0.25f + jointObjectsOffset,
+                    Color.green
+                );
+
+                Debug.DrawLine(
+                    instrumentCenter + jointObjectsOffset,
+                    instrumentCenter + instrumentUp.normalized * 0.18f + jointObjectsOffset,
+                    Color.yellow
+                );
             }
 
         }
