@@ -218,10 +218,10 @@ class ViolinModule(InstrumentModule):
                     
                     if y_distance > 0.08:
                         contact = 'lifted'  # Too far from string
-                    elif y_distance < 0.02 and pip_angle < 120 and dip_angle < 120:
-                        contact = 'pressed'  # Close to string AND both joints are bent
                     elif y_distance < 0.06 and (pip_angle < 150 or dip_angle < 150):
-                        contact = 'touching'  # Near string AND some bending
+                        contact = 'pressed'  # Near string AND some bending
+                    elif y_distance < 0.02 and pip_angle < 120 and dip_angle < 120:
+                        contact = 'touching'  # Close to string AND both joints are bent
                     else:
                         contact = 'lifted'  # Either too far or too extended
                     

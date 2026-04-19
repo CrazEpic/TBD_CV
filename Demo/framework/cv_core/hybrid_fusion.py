@@ -210,41 +210,22 @@ class HybridFusionEngine:
         q = self._normalize_quat(self._instrument_state.rotation)
         p = self._instrument_state.position
 
-        if instrument_name == "flute":
-            mouth_offset = np.array([0.05, 0.02, 0.0], dtype=np.float32)
-            left_offset = np.array([-0.12, 0.0, 0.0], dtype=np.float32)
-            right_offset = np.array([0.24, 0.0, 0.0], dtype=np.float32)
+        chin_offset = np.array([-0.05, 0.08, 0.0], dtype=np.float32)
+        neck_offset = np.array([0.22, 0.0, 0.0], dtype=np.float32)
+        bow_offset = np.array([0.0, -0.14, 0.0], dtype=np.float32)
 
-            mouth_target = p + self._rotate_vec(q, mouth_offset)
-            left_target = p + self._rotate_vec(q, left_offset)
-            right_target = p + self._rotate_vec(q, right_offset)
+        chin_target = p + self._rotate_vec(q, chin_offset)
+        left_target = p + self._rotate_vec(q, neck_offset)
+        right_target = p + self._rotate_vec(q, bow_offset)
 
-            left.position = 0.7 * left.position + 0.3 * left_target
-            right.position = 0.7 * right.position + 0.3 * right_target
-            if nose is not None:
-                nose.position = 0.85 * nose.position + 0.15 * mouth_target
+        left.position = 0.68 * left.position + 0.32 * left_target
+        right.position = 0.68 * right.position + 0.32 * right_target
+        if nose is not None:
+            nose.position = 0.85 * nose.position + 0.15 * chin_target
 
-            contacts["left_hand_to_flute"] = float(np.linalg.norm(left.position - left_target))
-            contacts["right_hand_to_flute"] = float(np.linalg.norm(right.position - right_target))
-            contacts["mouth_to_embouchure"] = float(np.linalg.norm((nose.position if nose is not None else mouth_target) - mouth_target))
-
-        else:
-            chin_offset = np.array([-0.05, 0.08, 0.0], dtype=np.float32)
-            neck_offset = np.array([0.22, 0.0, 0.0], dtype=np.float32)
-            bow_offset = np.array([0.0, -0.14, 0.0], dtype=np.float32)
-
-            chin_target = p + self._rotate_vec(q, chin_offset)
-            left_target = p + self._rotate_vec(q, neck_offset)
-            right_target = p + self._rotate_vec(q, bow_offset)
-
-            left.position = 0.68 * left.position + 0.32 * left_target
-            right.position = 0.68 * right.position + 0.32 * right_target
-            if nose is not None:
-                nose.position = 0.85 * nose.position + 0.15 * chin_target
-
-            contacts["left_hand_to_neck"] = float(np.linalg.norm(left.position - left_target))
-            contacts["right_hand_to_bow"] = float(np.linalg.norm(right.position - right_target))
-            contacts["chin_to_rest"] = float(np.linalg.norm((nose.position if nose is not None else chin_target) - chin_target))
+        contacts["left_hand_to_neck"] = float(np.linalg.norm(left.position - left_target))
+        contacts["right_hand_to_bow"] = float(np.linalg.norm(right.position - right_target))
+        contacts["chin_to_rest"] = float(np.linalg.norm((nose.position if nose is not None else chin_target) - chin_target))
 
         return contacts
 

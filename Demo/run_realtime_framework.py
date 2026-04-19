@@ -20,7 +20,7 @@ from framework.cv_core import (
     MediaPipeHolisticTracker,
     TemporalSmoother,
 )
-from framework.instruments import FluteModule, InstrumentModule, ViolinModule
+from framework.instruments import InstrumentModule, ViolinModule
 from framework.network import UDPBroadcaster
 
 
@@ -45,23 +45,12 @@ def _build_profiles(args) -> dict:
     payload = _load_calibration_file(args.calibration_file)
     profiles = payload.get("profiles", {}) if isinstance(payload.get("profiles", {}), dict) else {}
 
-    flute_profile = profiles.get("flute", {}) if isinstance(profiles.get("flute", {}), dict) else {}
     violin_profile = profiles.get("violin", {}) if isinstance(profiles.get("violin", {}), dict) else {}
-
-    if args.flute_key_radius > 0:
-        flute_profile["key_radius"] = float(args.flute_key_radius)
-    if args.flute_key_on_threshold >= 0:
-        flute_profile["key_on_threshold"] = float(args.flute_key_on_threshold)
-    if args.flute_key_off_threshold >= 0:
-        flute_profile["key_off_threshold"] = float(args.flute_key_off_threshold)
-    if args.flute_key_hold_frames > 0:
-        flute_profile["key_hold_frames"] = int(args.flute_key_hold_frames)
 
     if args.violin_string_width > 0:
         violin_profile["string_width"] = float(args.violin_string_width)
 
     return {
-        "flute": flute_profile,
         "violin": violin_profile,
     }
 
@@ -71,7 +60,6 @@ def build_instrument(mode: str, profiles: dict) -> Optional[InstrumentModule]:
         return None
     modules: Dict[str, InstrumentModule] = {
         "violin": ViolinModule(profile=profiles.get("violin", {})),
-        "flute": FluteModule(profile=profiles.get("flute", {})),
     }
     if mode not in modules:
         raise ValueError(f"Unknown instrument mode: {mode}")
@@ -111,13 +99,7 @@ def _draw_violin_schematic(frame, pose_data: dict) -> None:
     cv2.putText(frame, "violin body", (center_px[0] + 12, center_px[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1)
 
 
-def _draw_flute_schematic(frame, pose_data: dict) -> None:
-    if pose_data is None:
-        return
 
-    h, w = frame.shape[:2]
-    center = pose_data.get("center")
-    left_end = pose_data.get("left_end")
     right_end = pose_data.get("right_end")
     embouchure_point = pose_data.get("embouchure_point")
 
@@ -128,15 +110,6 @@ def _draw_flute_schematic(frame, pose_data: dict) -> None:
     left_px = _to_px(left_end, w, h)
     right_px = _to_px(right_end, w, h)
     embouchure_px = _to_px(embouchure_point, w, h) if embouchure_point is not None else center_px
-
-    # Main body, held horizontally to the right.
-    cv2.line(frame, left_px, right_px, (0, 210, 255), 5)
-    # Tone hole / embouchure area.
-    cv2.circle(frame, embouchure_px, 9, (255, 180, 0), -1)
-    # Key clusters.
-    cv2.circle(frame, center_px, 7, (0, 180, 255), -1)
-    cv2.putText(frame, "flute body", (center_px[0] + 12, center_px[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1)
-
 
 def _normalize_quat(q: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(q)
@@ -400,8 +373,6 @@ def run(args) -> None:
 
                     if instrument is not None and instrument.name() == "violin":
                         _draw_violin_schematic(frame, instrument_hint if instrument_hint is not None else instrument_pose)
-                    elif instrument is not None and instrument.name() == "flute":
-                        _draw_flute_schematic(frame, instrument_hint if instrument_hint is not None else instrument_pose)
 
                 # Keep selfie-style preview, but draw labels after flip so text stays readable.
                 display_frame = cv2.flip(frame, 1)
@@ -543,19 +514,7 @@ def run(args) -> None:
                                 pinky_color,
                                 1,
                             )
-                    elif instrument.name() == "flute":
-                        holes = instrument_interaction.get("holes_covered", [])
-                        emb = instrument_interaction.get("embouchure", {})
-                        cv2.putText(
-                            display_frame,
-                            f"Flute: holes={len(holes)} tone={emb.get('tone', 0.0):.2f} reg={emb.get('register', 1)}",
-                            (12, 180),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.46,
-                            (255, 230, 120),
-                            1,
-                        )
-
+                    
                 cv2.putText(
                     display_frame,
                     f"Stable joints: {len(hybrid_output.get('human_joints', {}))} | frame=cam-space",
@@ -593,16 +552,12 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Hybrid human+instrument tracking with Holistic + 6DoF fusion (UDP broadcast)"
     )
-    parser.add_argument("--instrument", choices=["none", "violin", "flute"], default="none")
+    parser.add_argument("--instrument", choices=["none", "violin"], default="none")
     parser.add_argument(
         "--calibration-file",
         default="config/instrument_profiles.json",
         help="Path to JSON calibration profile file.",
     )
-    parser.add_argument("--flute-key-radius", type=float, default=-1.0)
-    parser.add_argument("--flute-key-on-threshold", type=float, default=-1.0)
-    parser.add_argument("--flute-key-off-threshold", type=float, default=-1.0)
-    parser.add_argument("--flute-key-hold-frames", type=int, default=-1)
     parser.add_argument("--violin-string-width", type=float, default=-1.0)
     parser.add_argument("--fx", type=float, default=-1.0, help="Camera focal length fx in pixels. Defaults to frame width.")
     parser.add_argument("--fy", type=float, default=-1.0, help="Camera focal length fy in pixels. Defaults to frame height.")

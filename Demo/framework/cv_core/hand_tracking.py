@@ -64,7 +64,7 @@ class MediaPipeHolisticTracker:
         if results.right_hand_landmarks:
             right_hand = [[lm.x, lm.y, lm.z] for lm in results.right_hand_landmarks.landmark]
 
-        # Extract face mesh landmarks (used for flute alignment).
+        # Extract face mesh landmarks for pose tracking
         face: Optional[LandmarkList] = None
         if results.face_landmarks:
             face = [[lm.x, lm.y, lm.z] for lm in results.face_landmarks.landmark]
