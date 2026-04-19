@@ -34,6 +34,13 @@ class ViolinModule(InstrumentModule):
             "D": float(profile.get("arm_elevation_D", 0.60)),   # Elbow higher
             "G": float(profile.get("arm_elevation_G", 0.80)),   # Elbow high, arm lifted
         }
+        
+        # Finger detection thresholds
+        self._finger_contact_threshold_lifted = 0.08      # > this = lifted
+        self._finger_contact_threshold_touched = 0.05     # between 0.02-0.05 = touching
+        self._finger_contact_threshold_pressed = 0.02     # < this = pressed
+        self._finger_flexion_threshold_pressed = 0.25     # flexion score for pressing (lowered for easier detection)
+
 
     def name(self) -> str:
         return "violin"
@@ -173,12 +180,64 @@ class ViolinModule(InstrumentModule):
                 self._left_x_ema = 0.7 * self._left_x_ema + 0.3 * finger_x
                 finger_position = self._finger_position_from_x(self._left_x_ema)
 
+                # Enhanced finger detection using angle-based approach
+                string_baseline_y = wrist_local[1]  # Use wrist as reference for string position
+                
+                # Use angle data from FeatureExtractor (pip_angle and dip_angle)
+                # which directly measure joint bending
+                fingers_data = left.get("fingers", {})
+                
+                # Detect contact state for each finger
+                finger_contact_states = {}
+                for finger_name in ["index", "middle", "ring", "pinky"]:
+                    finger_info = fingers_data.get(finger_name, {})
+                    pip_angle = float(finger_info.get("pip_angle_deg", 180.0))
+                    dip_angle = float(finger_info.get("dip_angle_deg", 180.0))
+                    
+                    # Get fingertip position in local coordinates
+                    if finger_name == "index":
+                        finger_local = index_local
+                    elif finger_name == "middle":
+                        finger_local = middle_local
+                    elif finger_name == "ring":
+                        finger_local = ring_local
+                    else:  # pinky
+                        finger_local = pinky_local
+                    
+                    y_distance = abs(float(finger_local[1]) - float(string_baseline_y))
+                    
+                    # Detect state based on Y-distance AND joint angles
+                    # When fully extended: pip_angle ~ 180°, dip_angle ~ 180°
+                    # When pressed/curled: both angles significantly lower
+                    
+                    if y_distance > 0.08:
+                        contact = 'lifted'  # Too far from string
+                    elif y_distance < 0.02 and pip_angle < 120 and dip_angle < 120:
+                        contact = 'pressed'  # Close to string AND both joints are bent
+                    elif y_distance < 0.06 and (pip_angle < 150 or dip_angle < 150):
+                        contact = 'touching'  # Near string AND some bending
+                    else:
+                        contact = 'lifted'  # Either too far or too extended
+                    
+                    finger_contact_states[finger_name] = contact
+                
+                # Detect which finger is actively fretting
+                active_finger = self._detect_active_finger(finger_contact_states)
+                
+                # Convert to note
+                note_name = self._finger_position_to_note(string_contact, active_finger)
+
+                # Combine old and new finger state information
                 finger_states = {
                     "thumb": float(left["fingers"]["thumb"]["curled_score"]),
                     "index": float(np.clip(1.0 - abs(index_local[1]) / 0.05, 0.0, 1.0)),
                     "middle": float(np.clip(1.0 - abs(middle_local[1]) / 0.05, 0.0, 1.0)),
                     "ring": float(np.clip(1.0 - abs(ring_local[1]) / 0.05, 0.0, 1.0)),
                     "pinky": float(np.clip(1.0 - abs(pinky_local[1]) / 0.05, 0.0, 1.0)),
+                    # New: categorical contact states
+                    "contact_states": finger_contact_states,
+                    # New: active finger index
+                    "active_finger": int(active_finger),
                 }
 
                 left_hand = {
@@ -187,6 +246,8 @@ class ViolinModule(InstrumentModule):
                     "hand_shift": float(np.clip((self._left_x_ema + 0.05) / 0.25, 0.0, 1.0)),
                     "vibrato": float(np.clip(left["motion"]["wrist_speed"] * 0.15, 0.0, 1.0)),
                     "finger_states": finger_states,
+                    "active_finger": int(active_finger),  # New: which finger is pressing
+                    "note": note_name,  # New: the note being played
                     "wrist": wrist_local.tolist(),
                     "hand_forward": np.asarray(left["hand_pose"]["hand_forward"], dtype=np.float32).tolist(),
                 }
@@ -426,3 +487,114 @@ class ViolinModule(InstrumentModule):
         if n < 1e-8:
             return np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32)
         return q / n
+
+    def _extract_finger_joints(self, finger_tip: tuple | list | None, finger_pip: tuple | list | None, finger_mcp: tuple | list | None) -> dict | None:
+        """
+        Extract finger position and flexion information.
+        
+        Args:
+            finger_tip: Fingertip position (3D normalized coordinates)
+            finger_pip: Proximal interphalangeal joint (middle knuckle)
+            finger_mcp: Metacarpophalangeal joint (base knuckle)
+        
+        Returns:
+            Dict with 'tip', 'flexion', 'length' or None if data unavailable
+        """
+        if finger_tip is None or finger_pip is None or finger_mcp is None:
+            return None
+        
+        try:
+            tip = np.asarray(finger_tip, dtype=np.float32)
+            pip = np.asarray(finger_pip, dtype=np.float32)
+            mcp = np.asarray(finger_mcp, dtype=np.float32)
+            
+            # Distance from MCP to tip (fully extended)
+            full_length = np.linalg.norm(tip - mcp)
+            
+            # Distance from MCP to PIP
+            upper_length = np.linalg.norm(pip - mcp)
+            
+            # Flexion score (0 = fully extended, 1 = fully curled)
+            if upper_length > 1e-6:
+                flexion = np.clip(1.0 - (full_length / (upper_length * 2.0)), 0.0, 1.0)
+            else:
+                flexion = 0.0
+            
+            return {
+                'tip': tip,
+                'flexion': float(flexion),
+                'length': float(full_length)
+            }
+        except Exception:
+            return None
+
+    def _detect_finger_contact(self, finger_data: dict | None, string_baseline_y: float, sensitivity: float = 0.02) -> str:
+        """
+        Detect if finger is touching the string.
+        
+        Args:
+            finger_data: Finger joint information from _extract_finger_joints()
+            string_baseline_y: Y-position where string runs
+            sensitivity: Distance threshold for "pressed" state
+        
+        Returns:
+            'lifted', 'touching', or 'pressed'
+        """
+        if finger_data is None:
+            return 'lifted'
+        
+        try:
+            y_distance = abs(float(finger_data['tip'][1]) - float(string_baseline_y))
+            flexion = float(finger_data['flexion'])
+            
+            if y_distance > self._finger_contact_threshold_lifted:
+                return 'lifted'
+            
+            if y_distance < sensitivity and flexion > self._finger_flexion_threshold_pressed:
+                return 'pressed'
+            
+            if y_distance < self._finger_contact_threshold_touched:
+                return 'touching'
+            
+            return 'lifted'
+        except Exception:
+            return 'lifted'
+
+    def _detect_active_finger(self, finger_contact_states: dict) -> int:
+        """Determine which finger is actively fretting (pressed down)."""
+        fingers = ['index', 'middle', 'ring', 'pinky']
+        
+        for i, finger in enumerate(fingers, 1):
+            if finger_contact_states.get(finger) == 'pressed':
+                return i
+        
+        for i, finger in enumerate(fingers, 1):
+            if finger_contact_states.get(finger) == 'touching':
+                return i
+        
+        return 0
+
+    def _finger_position_to_note(self, current_string: str, active_finger: int) -> str:
+        """Map current string + active finger to musical note."""
+        string_to_note = {
+            "G": 7,
+            "D": 2,
+            "A": 9,
+            "E": 4,
+        }
+        
+        finger_to_semitone = {
+            0: 0,
+            1: 1,
+            2: 2,
+            3: 3,
+            4: 4,
+        }
+        
+        note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "Bb", "B"]
+        
+        base_note = string_to_note.get(current_string, 4)
+        semitone_offset = finger_to_semitone.get(active_finger, 0)
+        final_note_index = (base_note + semitone_offset) % 12
+        
+        return note_names[final_note_index]

@@ -455,6 +455,8 @@ def run(args) -> None:
                     if instrument.name() == "violin":
                         left_state = instrument_interaction.get("left_hand", {})
                         right_state = instrument_interaction.get("right_hand", {})
+                        
+                        # Main violin info
                         cv2.putText(
                             display_frame,
                             f"Violin: string={left_state.get('string', '?')} pos={left_state.get('finger_position', 0)} bow={right_state.get('bow_direction', '?')} speed={right_state.get('bow_speed', 0.0):.2f}",
@@ -464,6 +466,83 @@ def run(args) -> None:
                             (255, 230, 120),
                             1,
                         )
+                        
+                        # NEW: Finger detection info
+                        active_finger = left_state.get('active_finger', 0)
+                        note = left_state.get('note', '?')
+                        finger_names = {0: 'open', 1: 'index', 2: 'middle', 3: 'ring', 4: 'pinky'}
+                        
+                        # Display current note and active finger
+                        cv2.putText(
+                            display_frame,
+                            f"NOTE: {note}  FINGER: {finger_names.get(active_finger, '?')} ({active_finger})",
+                            (12, 228),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            (100, 255, 100) if active_finger > 0 else (200, 200, 200),
+                            2,
+                        )
+                        
+                        # Display all finger states
+                        finger_states = left_state.get('finger_states', {})
+                        contact_states = finger_states.get('contact_states', {})
+                        
+                        if contact_states:
+                            # Build finger state display
+                            state_display = ""
+                            state_colors = {'lifted': (150, 150, 150), 'touching': (255, 255, 0), 'pressed': (0, 255, 0)}
+                            
+                            # Index finger
+                            idx_state = contact_states.get('index', 'lifted')
+                            idx_color = state_colors.get(idx_state, (150, 150, 150))
+                            cv2.putText(
+                                display_frame,
+                                f"Index: {idx_state}",
+                                (12, 252),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.42,
+                                idx_color,
+                                1,
+                            )
+                            
+                            # Middle finger
+                            mid_state = contact_states.get('middle', 'lifted')
+                            mid_color = state_colors.get(mid_state, (150, 150, 150))
+                            cv2.putText(
+                                display_frame,
+                                f"Middle: {mid_state}",
+                                (150, 252),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.42,
+                                mid_color,
+                                1,
+                            )
+                            
+                            # Ring finger
+                            ring_state = contact_states.get('ring', 'lifted')
+                            ring_color = state_colors.get(ring_state, (150, 150, 150))
+                            cv2.putText(
+                                display_frame,
+                                f"Ring: {ring_state}",
+                                (280, 252),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.42,
+                                ring_color,
+                                1,
+                            )
+                            
+                            # Pinky finger
+                            pinky_state = contact_states.get('pinky', 'lifted')
+                            pinky_color = state_colors.get(pinky_state, (150, 150, 150))
+                            cv2.putText(
+                                display_frame,
+                                f"Pinky: {pinky_state}",
+                                (410, 252),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.42,
+                                pinky_color,
+                                1,
+                            )
                     elif instrument.name() == "flute":
                         holes = instrument_interaction.get("holes_covered", [])
                         emb = instrument_interaction.get("embouchure", {})
