@@ -24,23 +24,53 @@ class ViolinGeometry:
     # Z: lateral (toward bow arm)
 
     # Key points on violin for PnP solver
-    VIOLIN_PNP_POINTS = {
-        "body_center": np.array([0.0, 0.0, 0.0], dtype=np.float64),      # Body center (origin)
+    DEFAULT_VIOLIN_PNP_POINTS = {
+        "center": np.array([0.0, 0.0, 0.0], dtype=np.float64),      # Body center (origin)
         "neck_end": np.array([0.33, 0.0, 0.0], dtype=np.float64),         # Scroll end of neck (compressed)
-        "body_bottom": np.array([0.0, -0.14, 0.0], dtype=np.float64),     # Lower bout of body
+        "body_end": np.array([0.0, -0.14, 0.0], dtype=np.float64),     # Lower bout of body
         "chin_anchor": np.array([-0.05, 0.08, 0.0], dtype=np.float64),    # Chin rest contact point
+    }
+
+    VIOLIN_PNP_POINTS = {
+        k: v.copy() for k, v in DEFAULT_VIOLIN_PNP_POINTS.items()
+    }
+
+    DEFAULT_VIOLIN_STRINGS = {
+        "G": np.array([0.17, 0.03, 0.0], dtype=np.float64),
+        "D": np.array([0.17, 0.01, 0.0], dtype=np.float64),
+        "A": np.array([0.17, -0.01, 0.0], dtype=np.float64),
+        "E": np.array([0.17, -0.03, 0.0], dtype=np.float64),
+    }
+
+    DEFAULT_VIOLIN_STRING_SEGMENTS = {
+        "G": (
+            np.array([0.05, 0.03, 0.0], dtype=np.float64),
+            np.array([0.33, 0.03, 0.0], dtype=np.float64),
+        ),
+        "D": (
+            np.array([0.05, 0.01, 0.0], dtype=np.float64),
+            np.array([0.33, 0.01, 0.0], dtype=np.float64),
+        ),
+        "A": (
+            np.array([0.05, -0.01, 0.0], dtype=np.float64),
+            np.array([0.33, -0.01, 0.0], dtype=np.float64),
+        ),
+        "E": (
+            np.array([0.05, -0.03, 0.0], dtype=np.float64),
+            np.array([0.33, -0.03, 0.0], dtype=np.float64),
+        ),
     }
 
     # Extended geometry: strings and positions for detailed visualization
     VIOLIN_STRINGS = {
-        "G": np.array([0.17, 0.03, 0.0], dtype=np.float64),          # G string (midway along neck)
-        "D": np.array([0.17, 0.01, 0.0], dtype=np.float64),          # D string
-        "A": np.array([0.17, -0.01, 0.0], dtype=np.float64),         # A string
-        "E": np.array([0.17, -0.03, 0.0], dtype=np.float64),         # E string
+        k: v.copy() for k, v in DEFAULT_VIOLIN_STRINGS.items()
+    }
+    VIOLIN_STRING_SEGMENTS = {
+        k: (v[0].copy(), v[1].copy()) for k, v in DEFAULT_VIOLIN_STRING_SEGMENTS.items()
     }
 
     # Body outline points (for visualization)
-    VIOLIN_BODY_OUTLINE = [
+    DEFAULT_VIOLIN_BODY_OUTLINE = [
         np.array([0.02, 0.08, 0.03], dtype=np.float64),   # Upper bout left
         np.array([0.02, 0.08, -0.03], dtype=np.float64),  # Upper bout right
         np.array([0.08, 0.02, 0.04], dtype=np.float64),   # Middle left
@@ -49,15 +79,143 @@ class ViolinGeometry:
         np.array([0.02, -0.12, -0.03], dtype=np.float64), # Bottom right
     ]
 
+    VIOLIN_BODY_OUTLINE = [pt.copy() for pt in DEFAULT_VIOLIN_BODY_OUTLINE]
+
     # Fingerboard points (along the compressed neck)
-    VIOLIN_FINGERBOARD = [
+    DEFAULT_VIOLIN_FINGERBOARD = [
         np.array([0.05, -0.01, 0.0], dtype=np.float64),   # Fingerboard start (near body)
         np.array([0.17, -0.005, 0.0], dtype=np.float64),  # Fingerboard middle
         np.array([0.33, 0.0, 0.0], dtype=np.float64),     # Fingerboard end (scroll)
     ]
+    VIOLIN_FINGERBOARD = [pt.copy() for pt in DEFAULT_VIOLIN_FINGERBOARD]
     
     # Bow reference point (where bow hair contacts strings)
-    BOW_CONTACT_POINT = np.array([-0.05, 0.0, 0.0], dtype=np.float64)  # Near chin rest
+    DEFAULT_BOW_CONTACT_POINT = np.array([-0.05, 0.0, 0.0], dtype=np.float64)
+    BOW_CONTACT_POINT = DEFAULT_BOW_CONTACT_POINT.copy()  # Near chin rest
+
+    VIOLIN_SUPPLEMENTARY_KEYPOINTS: Dict[str, np.ndarray] = {}
+
+    @classmethod
+    def configure_from_profile(cls, profile: Dict[str, any] | None) -> None:
+        """Override default PnP model points from violin profile when available."""
+        cls.VIOLIN_PNP_POINTS = {
+            k: v.copy() for k, v in cls.DEFAULT_VIOLIN_PNP_POINTS.items()
+        }
+        cls.VIOLIN_STRINGS = {
+            k: v.copy() for k, v in cls.DEFAULT_VIOLIN_STRINGS.items()
+        }
+        cls.VIOLIN_STRING_SEGMENTS = {
+            k: (v[0].copy(), v[1].copy()) for k, v in cls.DEFAULT_VIOLIN_STRING_SEGMENTS.items()
+        }
+        cls.VIOLIN_BODY_OUTLINE = [pt.copy() for pt in cls.DEFAULT_VIOLIN_BODY_OUTLINE]
+        cls.VIOLIN_FINGERBOARD = [pt.copy() for pt in cls.DEFAULT_VIOLIN_FINGERBOARD]
+        cls.BOW_CONTACT_POINT = cls.DEFAULT_BOW_CONTACT_POINT.copy()
+        cls.VIOLIN_SUPPLEMENTARY_KEYPOINTS = {}
+
+        if not isinstance(profile, dict):
+            return
+
+        pnp = profile.get("pnp_keypoints", {})
+        if not isinstance(pnp, dict):
+            return
+
+        key_candidates = {
+            "center": ["center", "body_center"],
+            "neck_end": ["neck_end"],
+            "body_end": ["body_end", "body_bottom"],
+            "chin_anchor": ["chin_anchor"],
+        }
+
+        for dst_key, src_candidates in key_candidates.items():
+            value = None
+            for src_key in src_candidates:
+                candidate = pnp.get(src_key)
+                if isinstance(candidate, (list, tuple)) and len(candidate) == 3:
+                    value = candidate
+                    break
+
+            if not (isinstance(value, (list, tuple)) and len(value) == 3):
+                continue
+
+            try:
+                cls.VIOLIN_PNP_POINTS[dst_key] = np.array(
+                    [float(value[0]), float(value[1]), float(value[2])],
+                    dtype=np.float64,
+                )
+            except (TypeError, ValueError):
+                continue
+
+        geometry = profile.get("geometry", {})
+        if not isinstance(geometry, dict):
+            return
+
+        strings = geometry.get("strings", {})
+        if isinstance(strings, dict):
+            for name in ["G", "D", "A", "E"]:
+                value = strings.get(name)
+                parsed = cls._parse_vec3(value)
+                if parsed is not None:
+                    cls.VIOLIN_STRINGS[name] = parsed
+                    continue
+
+                parsed_pair = cls._parse_vec3_pair(value)
+                if parsed_pair is not None:
+                    p1, p2 = parsed_pair
+                    cls.VIOLIN_STRING_SEGMENTS[name] = (p1, p2)
+                    cls.VIOLIN_STRINGS[name] = ((p1 + p2) * 0.5).astype(np.float64)
+
+        body_outline = geometry.get("body_outline")
+        parsed_outline = cls._parse_vec3_list(body_outline)
+        if parsed_outline is not None and len(parsed_outline) >= 3:
+            cls.VIOLIN_BODY_OUTLINE = parsed_outline
+
+        fingerboard = geometry.get("fingerboard")
+        parsed_fingerboard = cls._parse_vec3_list(fingerboard)
+        if parsed_fingerboard is not None and len(parsed_fingerboard) >= 2:
+            cls.VIOLIN_FINGERBOARD = parsed_fingerboard
+
+        bow_contact = cls._parse_vec3(geometry.get("bow_contact"))
+        if bow_contact is not None:
+            cls.BOW_CONTACT_POINT = bow_contact
+
+        supplementary = geometry.get("supplementary_keypoints", {})
+        if isinstance(supplementary, dict):
+            for name, value in supplementary.items():
+                parsed = cls._parse_vec3(value)
+                if parsed is not None:
+                    cls.VIOLIN_SUPPLEMENTARY_KEYPOINTS[str(name)] = parsed
+
+    @staticmethod
+    def _parse_vec3(value) -> np.ndarray | None:
+        if not (isinstance(value, (list, tuple)) and len(value) == 3):
+            return None
+        try:
+            return np.array([float(value[0]), float(value[1]), float(value[2])], dtype=np.float64)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _parse_vec3_list(cls, value) -> List[np.ndarray] | None:
+        if not isinstance(value, list):
+            return None
+
+        parsed: List[np.ndarray] = []
+        for item in value:
+            vec = cls._parse_vec3(item)
+            if vec is None:
+                return None
+            parsed.append(vec)
+        return parsed
+
+    @classmethod
+    def _parse_vec3_pair(cls, value) -> Tuple[np.ndarray, np.ndarray] | None:
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            return None
+        p1 = cls._parse_vec3(value[0])
+        p2 = cls._parse_vec3(value[1])
+        if p1 is None or p2 is None:
+            return None
+        return p1, p2
 
     @staticmethod
     def get_pnp_points() -> Tuple[np.ndarray, List[str]]:
@@ -69,7 +227,7 @@ class ViolinGeometry:
         """
         points = []
         names = []
-        for name in ["body_center", "neck_end", "body_bottom", "chin_anchor"]:
+        for name in ["center", "neck_end", "body_end", "chin_anchor"]:
             points.append(ViolinGeometry.VIOLIN_PNP_POINTS[name])
             names.append(name)
         return np.array(points, dtype=np.float64), names
@@ -91,6 +249,13 @@ class ViolinGeometry:
             dtype=np.float64
         )
 
+        string_segments = []
+        for s in ["G", "D", "A", "E"]:
+            p1, p2 = ViolinGeometry.VIOLIN_STRING_SEGMENTS[s]
+            string_segments.append(p1)
+            string_segments.append(p2)
+        string_segments_array = np.array(string_segments, dtype=np.float64)
+
         body_outline = np.array(ViolinGeometry.VIOLIN_BODY_OUTLINE, dtype=np.float64)
         fingerboard = np.array(ViolinGeometry.VIOLIN_FINGERBOARD, dtype=np.float64)
         bow_contact = np.array([ViolinGeometry.BOW_CONTACT_POINT], dtype=np.float64)
@@ -98,6 +263,7 @@ class ViolinGeometry:
         return {
             "pnp_points": pnp_pts,
             "strings": strings_array,
+            "string_segments": string_segments_array,
             "body_outline": body_outline,
             "fingerboard": fingerboard,
             "bow_contact": bow_contact,
@@ -177,5 +343,26 @@ class ViolinGeometry:
             output[geom_name] = transformed.tolist()
             if projected is not None:
                 output[f"{geom_name}_2d"] = projected.tolist()
+
+        if ViolinGeometry.VIOLIN_SUPPLEMENTARY_KEYPOINTS:
+            names = sorted(ViolinGeometry.VIOLIN_SUPPLEMENTARY_KEYPOINTS.keys())
+            sup_points = np.array(
+                [ViolinGeometry.VIOLIN_SUPPLEMENTARY_KEYPOINTS[n] for n in names],
+                dtype=np.float64,
+            )
+            transformed, projected = ViolinGeometry.transform_points(
+                sup_points,
+                rvec,
+                tvec,
+                intrinsics,
+            )
+
+            output["supplementary_keypoints"] = {
+                name: transformed[i].tolist() for i, name in enumerate(names)
+            }
+            if projected is not None:
+                output["supplementary_keypoints_2d"] = {
+                    name: projected[i].tolist() for i, name in enumerate(names)
+                }
 
         return output

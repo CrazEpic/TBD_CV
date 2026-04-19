@@ -35,7 +35,6 @@ Now includes a hybrid Holistic + 6DoF fusion pipeline:
 - [Demo/framework/cv_core/hybrid_fusion.py](Demo/framework/cv_core/hybrid_fusion.py): confidence-weighted predict/update + constraints
 - [Demo/framework/instruments/base.py](Demo/framework/instruments/base.py): plugin interface
 - [Demo/framework/instruments/violin.py](Demo/framework/instruments/violin.py): violin plugin
-- [Demo/framework/instruments/flute.py](Demo/framework/instruments/flute.py): flute plugin
 - [Demo/framework/network/udp_broadcaster.py](Demo/framework/network/udp_broadcaster.py): UDP transport
 
 ## Why UDP
@@ -59,12 +58,6 @@ Violin interpretation mode:
 python Demo/run_realtime_framework.py --instrument violin --show-cv
 ```
 
-Flute interpretation mode:
-
-```bash
-python Demo/run_realtime_framework.py --instrument flute --show-cv
-```
-
 If you want no instrument behavior at all, use:
 
 ```bash
@@ -72,7 +65,7 @@ python Demo/run_realtime_framework.py --instrument none --show-cv
 ```
 
 This is webcam-only pose interpretation, not physical instrument detection.
-The violin and flute modes infer playing state from your body and hands.
+The violin mode infers playing state from your body and hands.
 If you want true markerless instrument detection, the next step is a trained detector model.
 
 Optional intrinsics (recommended):
@@ -100,6 +93,41 @@ UDP payload format:
   - stable contact errors
 
 The Unity receiver in [UnityProject/Assets/_Project/Scripts/MediapipeUDP.cs](UnityProject/Assets/_Project/Scripts/MediapipeUDP.cs) parses `hybrid_state_v2` packets directly.
+
+## Violin PnP Keypoint Calibration (Unity -> Python)
+
+Use the Unity editor to author accurate 3D keypoints directly on your scaled violin model.
+
+1. In Unity, select your violin root object and add `ViolinKeypointRig`.
+
+1. To auto-generate outline/fingerboard/string helper points, click `Generate Supplementary Template`.
+
+1. Move the generated driver markers in Scene view.
+
+1. Mirrored left-side points are shown as gizmos only (they are not created as scene objects).
+
+1. Exporter mirrors missing left-side points from right-side drivers and derives `center`, `neck_end`, `body_end`, `chin_anchor` from supplementary markers when possible.
+
+1. Optional drawing-only markers (not used by PnP): `string_G_bridge_side`, `string_G_fingerboard_end` (and the same pattern for D/A/E), `outline_01_bottom_center`, `outline_02_bottom_right_corner`, ..., `fingerboard_01_bridge_right_side`, `fingerboard_02_nut_right_side`, ..., `bow_contact`, or any custom key name.
+
+1. The supplementary template creates exactly these keys:
+  `outline_01_bottom_center, outline_02_bottom_right_corner, outline_03_top_right_corner, outline_04_upper_middle_body_end` (outline drivers),
+  `fingerboard_01_bridge_right_side, fingerboard_02_nut_right_side` (fingerboard drivers),
+  `string_G_bridge_side,string_G_fingerboard_end,string_D_bridge_side,string_D_fingerboard_end,string_A_bridge_side,string_A_fingerboard_end,string_E_bridge_side,string_E_fingerboard_end` (2 points per string).
+
+1. Click `Export Keypoints JSON`.
+
+By default, export writes to `../Demo/config/instrument_profiles.unity.json` from Unity project root.
+
+Run Python with that file:
+
+```bash
+python Demo/run_realtime_framework.py --instrument violin --calibration-file Demo/config/instrument_profiles.unity.json --show-cv
+```
+
+You can also copy the `profiles.violin.pnp_keypoints` block into [Demo/config/instrument_profiles.json](Demo/config/instrument_profiles.json).
+
+`profiles.violin.geometry` is optional and controls non-PnP drawing geometry.
 
 ## Extending Instruments
 

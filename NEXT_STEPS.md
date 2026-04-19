@@ -9,7 +9,6 @@ This project is currently a real-time play workflow for instrument interaction u
 - Hybrid temporal fusion for stabilized joints and instrument pose
 - Instrument interaction logic for:
   - Violin fingering and bowing
-  - Flute fingering and key pressing
 - UDP JSON streaming to Unity with packet type hybrid_state_v2
 
 The active runtime path is centered in:
@@ -18,7 +17,6 @@ The active runtime path is centered in:
 - [Demo/framework/cv_core/instrument_6dof.py](Demo/framework/cv_core/instrument_6dof.py)
 - [Demo/framework/cv_core/hybrid_fusion.py](Demo/framework/cv_core/hybrid_fusion.py)
 - [Demo/framework/instruments/violin.py](Demo/framework/instruments/violin.py)
-- [Demo/framework/instruments/flute.py](Demo/framework/instruments/flute.py)
 - [Demo/framework/network/udp_broadcaster.py](Demo/framework/network/udp_broadcaster.py)
 - [UnityProject/Assets/_Project/Scripts/MediapipeUDP.cs](UnityProject/Assets/_Project/Scripts/MediapipeUDP.cs)
 - [UnityProject/Assets/_Project/Scripts/AvatarController.cs](UnityProject/Assets/_Project/Scripts/AvatarController.cs)
@@ -31,12 +29,6 @@ Profile defaults now live in:
 
 Supported profile values:
 
-- Flute:
-  - key_centers
-  - key_radius
-  - key_on_threshold
-  - key_off_threshold
-  - key_hold_frames
 - Violin:
   - string_centers
   - string_width
@@ -52,25 +44,19 @@ From repository root:
 
    pip install -r requirements.txt
 
-2. Run flute mode with CV window
-
-   python Demo/run_realtime_framework.py --instrument flute --show-cv
-
-3. Run violin mode with CV window
+2. Run violin mode with CV window
 
    python Demo/run_realtime_framework.py --instrument violin --show-cv
 
-4. Optional camera intrinsics override
+3. Optional camera intrinsics override
 
    python Demo/run_realtime_framework.py --instrument violin --fx 1100 --fy 1100 --cx 640 --cy 360 --show-cv
 
-5. Optional calibration file override
+4. Optional calibration file override
 
-   python Demo/run_realtime_framework.py --instrument flute --show-cv --calibration-file Demo/config/instrument_profiles.json
+   python Demo/run_realtime_framework.py --instrument violin --show-cv --calibration-file Demo/config/instrument_profiles.json
 
-6. Optional quick tuning overrides from CLI
-
-   python Demo/run_realtime_framework.py --instrument flute --show-cv --flute-key-radius 0.04 --flute-key-on-threshold 0.68 --flute-key-off-threshold 0.48 --flute-key-hold-frames 3
+5. Optional quick tuning overrides from CLI
 
    python Demo/run_realtime_framework.py --instrument violin --show-cv --violin-string-width 0.022
 
@@ -92,17 +78,10 @@ Current UDP payload includes:
 
 ### Smoke Test
 
-- Launch Python runtime for flute and violin separately.
+- Launch Python runtime for violin.
 - Confirm no immediate runtime errors.
 - Confirm OpenCV overlay updates continuously.
 - Confirm Unity avatar responds in Play mode.
-
-### Flute Validation
-
-- Hold stable fingerings for 5 to 10 seconds each.
-- Check holes_covered stability with minimal flicker.
-- Perform quick press and release transitions and verify response delay is acceptable.
-- Tune key_radius and key_on or key_off thresholds if false presses occur.
 
 ### Violin Validation
 
@@ -113,7 +92,7 @@ Current UDP payload includes:
 
 ### Repeatable Scenario Set
 
-Capture at least three short runs per instrument:
+Capture at least three short runs:
 
 - steady hold
 - controlled transitions
@@ -136,7 +115,7 @@ Keep lighting and camera position consistent across runs.
    - Report FPS and per-stage processing times.
 
 5. Add Unity-side debug panel.
-   - Show live values for holes_covered, violin string, finger_position, bow_direction, and confidence.
+   - Show live values for violin string, finger_position, bow_direction, and confidence.
 
 ## Known Limitations
 

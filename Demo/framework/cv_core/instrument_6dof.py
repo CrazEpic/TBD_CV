@@ -21,8 +21,18 @@ class InstrumentPoseMeasurement:
 class InstrumentPoseEstimator:
     """Estimate rigid instrument 6DoF using solvePnP."""
 
-    def __init__(self, mode: str = "pnp") -> None:
+    _DEFAULT_MODEL_POINTS: Dict[str, Dict[str, list[float]]] = {
+        "violin": {
+            "center": [0.0, 0.0, 0.0],
+            "neck_end": [0.33, 0.0, 0.0],
+            "body_end": [0.0, -0.14, 0.0],
+            "chin_anchor": [-0.05, 0.08, 0.0],
+        },
+    }
+
+    def __init__(self, mode: str = "pnp", profiles: Optional[Dict[str, Any]] = None) -> None:
         self.mode = mode
+        self.profiles = profiles or {}
 
     def estimate(
         self,
@@ -89,27 +99,18 @@ class InstrumentPoseEstimator:
             tvec=tvec.reshape(3).astype(np.float32),
         )
 
-    @staticmethod
     def _build_correspondences(
+        self,
         hint_pose: Dict[str, Any],
         instrument_name: str,
         width: int,
         height: int,
     ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
-        if instrument_name == "violin":
-            key_specs = [
-                ("center", [0.0, 0.0, 0.0]),
-                ("neck_end", [0.22, 0.0, 0.0]),
-                ("body_end", [0.0, -0.14, 0.0]),
-                ("chin_anchor", [-0.05, 0.08, 0.0]),
-            ]
-        else:
-            key_specs = [
-                ("center", [0.0, 0.0, 0.0]),
-                ("left_end", [-0.12, 0.0, 0.0]),
-                ("right_end", [0.35, 0.0, 0.0]),
-                ("embouchure_point", [0.05, 0.02, 0.0]),
-            ]
+        model_points = self._get_model_points(instrument_name)
+        if not model_points:
+            return None, None
+
+        key_specs = [(k, v) for k, v in model_points.items()]
 
         obj = []
         img = []
@@ -126,6 +127,44 @@ class InstrumentPoseEstimator:
             return None, None
 
         return np.asarray(obj, dtype=np.float64), np.asarray(img, dtype=np.float64)
+
+    def _get_model_points(self, instrument_name: str) -> Dict[str, list[float]]:
+        defaults = self._DEFAULT_MODEL_POINTS.get(instrument_name, {})
+        if not defaults:
+            return {}
+
+        instrument_profile = self.profiles.get(instrument_name, {}) if isinstance(self.profiles, dict) else {}
+        if not isinstance(instrument_profile, dict):
+            return dict(defaults)
+
+        if instrument_name != "violin":
+            return dict(defaults)
+
+        profile_pts = instrument_profile.get("pnp_keypoints", {})
+        if not isinstance(profile_pts, dict):
+            return dict(defaults)
+
+        merged: Dict[str, list[float]] = {}
+        for key, fallback in defaults.items():
+            candidate = profile_pts.get(key)
+            if self._is_valid_xyz(candidate):
+                merged[key] = [float(candidate[0]), float(candidate[1]), float(candidate[2])]
+            else:
+                merged[key] = list(fallback)
+
+        return merged
+
+    @staticmethod
+    def _is_valid_xyz(v: Any) -> bool:
+        if not isinstance(v, (list, tuple)) or len(v) != 3:
+            return False
+        try:
+            float(v[0])
+            float(v[1])
+            float(v[2])
+        except (TypeError, ValueError):
+            return False
+        return True
 
     @staticmethod
     def _quat_from_rvec(rvec: np.ndarray) -> list[float]:
