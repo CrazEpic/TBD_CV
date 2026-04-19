@@ -14,7 +14,7 @@ public class MediapipeUDP : MonoBehaviour
 
     private UdpClient udpClient;
     private Thread receiveThread;
-    private readonly object lockObject = new();
+    public readonly object lockObject = new();
 
     // Typed enum for pose landmarks
     public enum PoseLandmark

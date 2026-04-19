@@ -3,6 +3,7 @@ from .feature_extraction import FeatureExtractor
 from .hybrid_fusion import HybridFusionEngine, JointMeasurement
 from .instrument_6dof import InstrumentPoseEstimator
 from .smoothing import TemporalSmoother
+from .violin_geometry import ViolinGeometry
 
 __all__ = [
     "HolisticState",
@@ -12,4 +13,5 @@ __all__ = [
     "InstrumentPoseEstimator",
     "HybridFusionEngine",
     "TemporalSmoother",
+    "ViolinGeometry",
 ]

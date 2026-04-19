@@ -19,6 +19,7 @@ from framework.cv_core import (
     JointMeasurement,
     MediaPipeHolisticTracker,
     TemporalSmoother,
+    ViolinGeometry,
 )
 from framework.instruments import InstrumentModule, ViolinModule
 from framework.network import UDPBroadcaster
@@ -99,17 +100,89 @@ def _draw_violin_schematic(frame, pose_data: dict) -> None:
     cv2.putText(frame, "violin body", (center_px[0] + 12, center_px[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1)
 
 
-
-    right_end = pose_data.get("right_end")
-    embouchure_point = pose_data.get("embouchure_point")
-
-    if center is None or left_end is None or right_end is None:
+def _draw_violin_3d_geometry(frame, violin_geometry_3d: dict) -> None:
+    """
+    Draw 3D violin geometry (strings, fingerboard, body outline, bow) on camera frame.
+    Uses 2D projections from PnP-solved pose.
+    """
+    if violin_geometry_3d is None:
         return
 
-    center_px = _to_px(center, w, h)
-    left_px = _to_px(left_end, w, h)
-    right_px = _to_px(right_end, w, h)
-    embouchure_px = _to_px(embouchure_point, w, h) if embouchure_point is not None else center_px
+    h, w = frame.shape[:2]
+
+    # Draw strings (4 points: G, D, A, E)
+    strings_2d = violin_geometry_3d.get("strings_2d")
+    if strings_2d and len(strings_2d) >= 4:
+        string_names = ["G", "D", "A", "E"]
+        string_colors = [(0, 255, 255), (255, 255, 0), (255, 0, 255), (0, 255, 0)]
+        for i, (pt_2d, name, color) in enumerate(zip(strings_2d, string_names, string_colors)):
+            if pt_2d and len(pt_2d) >= 2:
+                x, y = int(pt_2d[0]), int(pt_2d[1])
+                if 0 <= x < w and 0 <= y < h:
+                    cv2.circle(frame, (x, y), 5, color, -1)
+                    cv2.putText(frame, name, (x + 8, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
+    # Draw fingerboard (connecting fingerboard points)
+    fingerboard_2d = violin_geometry_3d.get("fingerboard_2d")
+    if fingerboard_2d and len(fingerboard_2d) >= 2:
+        pts = []
+        for pt_2d in fingerboard_2d:
+            if pt_2d and len(pt_2d) >= 2:
+                x, y = int(pt_2d[0]), int(pt_2d[1])
+                if 0 <= x < w and 0 <= y < h:
+                    pts.append((x, y))
+        
+        # Draw fingerboard line
+        if len(pts) >= 2:
+            for i in range(len(pts) - 1):
+                cv2.line(frame, pts[i], pts[i + 1], (200, 150, 100), 2)
+        
+        # Draw fingerboard points
+        for pt in pts:
+            cv2.circle(frame, pt, 4, (200, 150, 100), -1)
+
+    # Draw body outline (connecting body points)
+    body_outline_2d = violin_geometry_3d.get("body_outline_2d")
+    if body_outline_2d and len(body_outline_2d) >= 4:
+        pts = []
+        for pt_2d in body_outline_2d:
+            if pt_2d and len(pt_2d) >= 2:
+                x, y = int(pt_2d[0]), int(pt_2d[1])
+                if 0 <= x < w and 0 <= y < h:
+                    pts.append((x, y))
+        
+        # Draw body outline as connected points
+        if len(pts) >= 2:
+            for i in range(len(pts) - 1):
+                cv2.line(frame, pts[i], pts[i + 1], (100, 200, 255), 2)
+            # Connect last to first to close the outline
+            if len(pts) > 2:
+                cv2.line(frame, pts[-1], pts[0], (100, 200, 255), 2)
+        
+        # Draw body points
+        for pt in pts:
+            cv2.circle(frame, pt, 3, (100, 200, 255), -1)
+
+    # Draw bow contact point (where bow contacts strings)
+    bow_contact_2d = violin_geometry_3d.get("bow_contact_2d")
+    if bow_contact_2d and len(bow_contact_2d) >= 1:
+        if bow_contact_2d[0] and len(bow_contact_2d[0]) >= 2:
+            x, y = int(bow_contact_2d[0][0]), int(bow_contact_2d[0][1])
+            if 0 <= x < w and 0 <= y < h:
+                cv2.circle(frame, (x, y), 7, (255, 0, 0), 2)  # Blue circle for bow
+                cv2.putText(frame, "BOW", (x + 10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
+
+    # Draw PnP reference points (debug info)
+    pnp_2d = violin_geometry_3d.get("pnp_points_2d")
+    if pnp_2d and len(pnp_2d) >= 4:
+        pnp_names = ["body", "neck", "bottom", "chin"]
+        for pt_2d, name in zip(pnp_2d, pnp_names):
+            if pt_2d and len(pt_2d) >= 2:
+                x, y = int(pt_2d[0]), int(pt_2d[1])
+                if 0 <= x < w and 0 <= y < h:
+                    cv2.circle(frame, (x, y), 6, (50, 50, 255), 2)
+                    cv2.putText(frame, name, (x - 15, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (50, 50, 255), 1)
+
 
 def _normalize_quat(q: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(q)
@@ -220,6 +293,11 @@ def run(args) -> None:
     missed_frames = 0
     prev_t = time.time()
     intrinsics: Optional[Dict[str, float]] = None
+    
+    # Smoothed violin geometry for temporal stability
+    prev_violin_rvec = None
+    prev_violin_tvec = None
+    violin_pose_alpha = 0.3  # EMA smoothing factor (0.3 = moderate smoothing)
 
     try:
         while True:
@@ -260,6 +338,7 @@ def run(args) -> None:
 
             instrument_measurement_raw = None
             instrument_measurement = None
+            violin_points_measurements = {}
             if instrument is not None:
                 instrument_measurement_raw = instrument_estimator.estimate(
                     frame_bgr=frame,
@@ -273,8 +352,50 @@ def run(args) -> None:
                         rotation=instrument_measurement_raw.rotation,
                         confidence=instrument_measurement_raw.confidence,
                     )
+                    
+                    # Extract violin geometry points if available
+                    if hasattr(instrument_measurement_raw, 'rvec') and hasattr(instrument_measurement_raw, 'tvec'):
+                        violin_geom_output = ViolinGeometry.build_violin_output(
+                            instrument_measurement_raw.rvec,
+                            instrument_measurement_raw.tvec,
+                            intrinsics
+                        )
+                        
+                        # Create measurements for violin geometry points
+                        # Strings
+                        strings = violin_geom_output.get('strings', [])
+                        string_names = ['G', 'D', 'A', 'E']
+                        for i, string_pos in enumerate(strings):
+                            name = f"violin_string_{string_names[i]}" if i < len(string_names) else f"violin_string_{i}"
+                            violin_points_measurements[name] = JointMeasurement(
+                                position=string_pos if isinstance(string_pos, (list, tuple)) else string_pos.tolist(),
+                                rotation=[0.0, 0.0, 0.0, 1.0],
+                                confidence=float(instrument_measurement_raw.confidence)
+                            )
+                        
+                        # PnP reference points
+                        pnp_points = violin_geom_output.get('pnp_points', [])
+                        pnp_names = ['body_center', 'neck_end', 'body_bottom', 'chin_anchor']
+                        for i, pnp_pos in enumerate(pnp_points):
+                            name = f"violin_pnp_{pnp_names[i]}" if i < len(pnp_names) else f"violin_pnp_{i}"
+                            violin_points_measurements[name] = JointMeasurement(
+                                position=pnp_pos if isinstance(pnp_pos, (list, tuple)) else pnp_pos.tolist(),
+                                rotation=[0.0, 0.0, 0.0, 1.0],
+                                confidence=float(instrument_measurement_raw.confidence)
+                            )
+                        
+                        # Bow contact point
+                        bow_contact = violin_geom_output.get('bow_contact', [])
+                        if bow_contact and len(bow_contact) > 0:
+                            bow_pos = bow_contact[0]
+                            violin_points_measurements['violin_bow_contact'] = JointMeasurement(
+                                position=bow_pos if isinstance(bow_pos, (list, tuple)) else bow_pos.tolist(),
+                                rotation=[0.0, 0.0, 0.0, 1.0],
+                                confidence=float(instrument_measurement_raw.confidence)
+                            )
 
             human_measurements = _build_human_measurements(smoothed_state, frame_w, frame_h, intrinsics)
+            human_measurements.update(violin_points_measurements)
 
             hybrid_output = fusion.update(
                 dt=dt,
@@ -309,6 +430,33 @@ def run(args) -> None:
             # Build raw measurement dict (use raw state, not smoothed, to avoid timing issues)
             raw_measurements = _build_human_measurements(state, frame_w, frame_h, intrinsics)
             
+            # Extract 3D violin geometry if we have a valid instrument measurement with PnP solution
+            violin_geometry_3d = None
+            if (instrument is not None and 
+                instrument.name() == "violin" and 
+                instrument_measurement_raw is not None and 
+                instrument_measurement_raw.rvec is not None and 
+                instrument_measurement_raw.tvec is not None):
+                
+                # Smooth the PnP pose for temporal stability
+                rvec = instrument_measurement_raw.rvec.copy()
+                tvec = instrument_measurement_raw.tvec.copy()
+                
+                if prev_violin_rvec is not None:
+                    # EMA smoothing on rotation and translation vectors
+                    rvec = (1.0 - violin_pose_alpha) * prev_violin_rvec + violin_pose_alpha * rvec
+                    tvec = (1.0 - violin_pose_alpha) * prev_violin_tvec + violin_pose_alpha * tvec
+                
+                prev_violin_rvec = rvec
+                prev_violin_tvec = tvec
+                
+                # Use smoothed PnP-solved vectors to project full violin geometry to 3D
+                violin_geometry_3d = ViolinGeometry.build_violin_output(
+                    rvec,
+                    tvec,
+                    intrinsics
+                )
+            
             # Convert to hybrid state format for broadcasting
             human_joints = {
                 key: {
@@ -316,16 +464,20 @@ def run(args) -> None:
                     "rotation": meas.rotation,
                     "confidence": meas.confidence,
                 }
-                for key, meas in raw_measurements.items()
+                for key, meas in human_measurements.items()
             }
             
-            hybrid_output = {
+            hybrid_output_broadcast = {
                 "human_joints": human_joints,
-                "instrument": {"position": [0, 0, 0], "rotation": [0, 0, 0, 1], "confidence": 0},
-                "contacts": {},
+                "instrument": hybrid_output.get("instrument", {"position": [0, 0, 0], "rotation": [0, 0, 0, 1], "confidence": 0}),
+                "contacts": hybrid_output.get("contacts", {}),
             }
             
-            broadcaster.send_hybrid_state(hybrid_output)
+            # Add violin geometry if available
+            if violin_geometry_3d is not None:
+                hybrid_output_broadcast["violin_geometry"] = violin_geometry_3d
+            
+            broadcaster.send_hybrid_state(hybrid_output_broadcast)
 
             if args.show_cv:
                 frame.flags.writeable = True
@@ -373,6 +525,8 @@ def run(args) -> None:
 
                     if instrument is not None and instrument.name() == "violin":
                         _draw_violin_schematic(frame, instrument_hint if instrument_hint is not None else instrument_pose)
+                        # Draw 3D violin geometry (strings, fingerboard, body)
+                        _draw_violin_3d_geometry(frame, violin_geometry_3d)
 
                 # Keep selfie-style preview, but draw labels after flip so text stays readable.
                 display_frame = cv2.flip(frame, 1)

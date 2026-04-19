@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import numpy as np
+import cv2
 
 from .base import InstrumentModule
-from ..audio_engine import get_audio_engine
 
 
 class ViolinModule(InstrumentModule):
@@ -15,11 +15,6 @@ class ViolinModule(InstrumentModule):
         self._prev_right_wrist_local = None
         self._prev_t = None
         self._arm_elevation_ema = None  # For temporal smoothing of arm elevation signal
-        
-        # Audio synthesis for note playback
-        self._audio_engine = get_audio_engine()
-        self._current_playing_note = None
-        self._last_bow_speed = 0.0
 
         self._string_centers = {
             "G": float(profile.get("string_centers", {}).get("G", 0.030)),
@@ -61,7 +56,6 @@ class ViolinModule(InstrumentModule):
 
         joints = pose["joints"]
         left_shoulder = np.asarray(joints["left_shoulder"], dtype=np.float32)
-        right_shoulder = np.asarray(joints["right_shoulder"], dtype=np.float32)
         nose = np.asarray(joints["nose"], dtype=np.float32)
         left_ear = np.asarray(joints["left_ear"], dtype=np.float32)
         right_ear = np.asarray(joints["right_ear"], dtype=np.float32)
@@ -69,23 +63,38 @@ class ViolinModule(InstrumentModule):
         left_elbow = np.asarray(joints["left_elbow"], dtype=np.float32)
 
         body_up = np.asarray(pose["torso"]["body_up"], dtype=np.float32)
-
-        shoulder_line = self._normalize(right_shoulder - left_shoulder)
         head_center = (nose + left_ear + right_ear) / 3.0
 
-        # Violin sits on the left shoulder and points forward-left.
-        neck_axis = self._normalize((left_wrist - left_shoulder) + shoulder_line * 0.35)
-        body_axis = self._normalize(np.cross(body_up, shoulder_line))
+        # Chin anchor at head/shoulder junction (where chin rest contacts chin/shoulder)
+        # This is the main contact point - violin rests here
+        chin_anchor_3d = left_shoulder * 0.80 + head_center * 0.20
+        
+        # Use angle from chin to wrist for neck direction (not weighted by wrist distance)
+        chin_to_wrist = self._normalize(left_wrist - chin_anchor_3d)
+        neck_axis = chin_to_wrist
+        
+        # Left arm points from shoulder to elbow (determines body orientation, not right hand)
+        left_arm_axis = self._normalize(left_elbow - left_shoulder)
+        
+        # Body axis: perpendicular to neck, along left arm direction (not affected by right hand)
+        body_axis = self._normalize(np.cross(neck_axis, left_arm_axis))
         if np.linalg.norm(body_axis) < 1e-8:
+            # Fallback: use vertical axis if parallel
             body_axis = self._normalize(np.cross(neck_axis, body_up))
 
-        # Use a consistent right-handed frame for drawing.
+        # Ensure right-handed frame
         up = self._normalize(np.cross(neck_axis, body_axis))
-
-        center = (left_shoulder * 0.70 + left_elbow * 0.15 + left_wrist * 0.15).tolist()
-        neck_end = (np.asarray(center, dtype=np.float32) + neck_axis * 0.22).tolist()
-        body_end = (np.asarray(center, dtype=np.float32) - body_axis * 0.14).tolist()
-        chin_anchor = (left_shoulder * 0.35 + head_center * 0.65).tolist()
+        
+        # Position violin with chin rest as the anchor (center of coordinate system)
+        center = chin_anchor_3d.tolist()
+        
+        # Neck extends toward left wrist (scroll direction) - compress to 2/3 of previous
+        neck_end = (chin_anchor_3d + neck_axis * 0.33).tolist()
+        
+        # Body extends downward from chin rest position (lower bout)
+        body_end = (chin_anchor_3d - body_axis * 0.14).tolist()
+        
+        chin_anchor = center
 
         confidence = 0.30
         if left is not None:
@@ -320,9 +329,6 @@ class ViolinModule(InstrumentModule):
                     "bow_angle": bow_angle,
                     "wrist_velocity": np.asarray(right["motion"]["wrist_velocity"], dtype=np.float32).tolist(),
                 }
-                
-                # Audio playback: Play note when bow is moving with a finger pressed
-                self._handle_audio_playback(left_hand, bow_speed)
 
         return {
             "type": self.name(),
@@ -607,52 +613,3 @@ class ViolinModule(InstrumentModule):
         final_note_index = (base_note + semitone_offset) % 12
         
         return note_names[final_note_index]
-    
-    def _handle_audio_playback(self, left_hand: dict, bow_speed: float):
-        """
-        Play audio when bow is moving and a note is selected.
-        
-        Conditions for playback:
-        1. Bow speed > 0.5 (bow is moving fast enough)
-        2. Active finger > 0 (a finger is pressed, not open string)
-        3. Note is different from previous note (avoid re-triggering same note)
-        """
-        if self._audio_engine is None:
-            return
-        
-        note = left_hand.get("note", "")
-        active_finger = left_hand.get("active_finger", 0)
-        finger_states = left_hand.get("finger_states", {})
-        contact_states = finger_states.get("contact_states", {})
-        
-        # Check if any finger is pressed (not just touching)
-        has_pressed_finger = any(
-            state == "pressed" for state in contact_states.values()
-        )
-        
-        # Only play if bow is moving significantly and finger is pressed
-        is_bow_moving = bow_speed > 0.5
-        should_play = is_bow_moving and has_pressed_finger and note
-        
-        # Check if note changed (to avoid retriggering the same note rapidly)
-        note_changed = note != self._current_playing_note
-        
-        if should_play and note_changed:
-            # Start playing the new note
-            try:
-                self._audio_engine.play_continuous(
-                    note_name=note,
-                    bow_speed=min(1.0, bow_speed * 1.5),  # Scale bow speed for volume
-                    max_duration=2.0  # Max 2 seconds, will be interrupted by next note
-                )
-                self._current_playing_note = note
-            except Exception as e:
-                # Silently fail if audio engine has issues
-                pass
-        
-        elif not should_play and self._current_playing_note is not None:
-            # Stop playing if conditions are no longer met
-            self._audio_engine.stop()
-            self._current_playing_note = None
-        
-        self._last_bow_speed = bow_speed

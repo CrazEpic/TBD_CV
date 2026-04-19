@@ -14,6 +14,8 @@ class InstrumentPoseMeasurement:
     confidence: float
     source: str
     reprojection_error: float
+    rvec: Optional[np.ndarray] = None  # Rotation vector for geometry transformation
+    tvec: Optional[np.ndarray] = None  # Translation vector for geometry transformation
 
 
 class InstrumentPoseEstimator:
@@ -83,6 +85,8 @@ class InstrumentPoseEstimator:
             confidence=confidence,
             source="pnp",
             reprojection_error=err,
+            rvec=rvec.astype(np.float32),
+            tvec=tvec.reshape(3).astype(np.float32),
         )
 
     @staticmethod
