@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from .base import InstrumentModule
+from ..audio_engine import get_audio_engine
 
 
 class ViolinModule(InstrumentModule):
@@ -14,6 +15,11 @@ class ViolinModule(InstrumentModule):
         self._prev_right_wrist_local = None
         self._prev_t = None
         self._arm_elevation_ema = None  # For temporal smoothing of arm elevation signal
+        
+        # Audio synthesis for note playback
+        self._audio_engine = get_audio_engine()
+        self._current_playing_note = None
+        self._last_bow_speed = 0.0
 
         self._string_centers = {
             "G": float(profile.get("string_centers", {}).get("G", 0.030)),
@@ -314,6 +320,9 @@ class ViolinModule(InstrumentModule):
                     "bow_angle": bow_angle,
                     "wrist_velocity": np.asarray(right["motion"]["wrist_velocity"], dtype=np.float32).tolist(),
                 }
+                
+                # Audio playback: Play note when bow is moving with a finger pressed
+                self._handle_audio_playback(left_hand, bow_speed)
 
         return {
             "type": self.name(),
@@ -598,3 +607,52 @@ class ViolinModule(InstrumentModule):
         final_note_index = (base_note + semitone_offset) % 12
         
         return note_names[final_note_index]
+    
+    def _handle_audio_playback(self, left_hand: dict, bow_speed: float):
+        """
+        Play audio when bow is moving and a note is selected.
+        
+        Conditions for playback:
+        1. Bow speed > 0.5 (bow is moving fast enough)
+        2. Active finger > 0 (a finger is pressed, not open string)
+        3. Note is different from previous note (avoid re-triggering same note)
+        """
+        if self._audio_engine is None:
+            return
+        
+        note = left_hand.get("note", "")
+        active_finger = left_hand.get("active_finger", 0)
+        finger_states = left_hand.get("finger_states", {})
+        contact_states = finger_states.get("contact_states", {})
+        
+        # Check if any finger is pressed (not just touching)
+        has_pressed_finger = any(
+            state == "pressed" for state in contact_states.values()
+        )
+        
+        # Only play if bow is moving significantly and finger is pressed
+        is_bow_moving = bow_speed > 0.5
+        should_play = is_bow_moving and has_pressed_finger and note
+        
+        # Check if note changed (to avoid retriggering the same note rapidly)
+        note_changed = note != self._current_playing_note
+        
+        if should_play and note_changed:
+            # Start playing the new note
+            try:
+                self._audio_engine.play_continuous(
+                    note_name=note,
+                    bow_speed=min(1.0, bow_speed * 1.5),  # Scale bow speed for volume
+                    max_duration=2.0  # Max 2 seconds, will be interrupted by next note
+                )
+                self._current_playing_note = note
+            except Exception as e:
+                # Silently fail if audio engine has issues
+                pass
+        
+        elif not should_play and self._current_playing_note is not None:
+            # Stop playing if conditions are no longer met
+            self._audio_engine.stop()
+            self._current_playing_note = None
+        
+        self._last_bow_speed = bow_speed
