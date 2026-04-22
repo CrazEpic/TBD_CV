@@ -21,7 +21,11 @@ public class ViolinKeypointRig : MonoBehaviour
 
     [Header("Editor")]
     public bool drawLabels = true;
-    public float gizmoSize = 0.005f;
+    public float gizmoSize = 0.001f;
+
+    [Header("Preview")]
+    public bool showDerivedKeypointPreview = true;
+    public float previewGizmoSize = 0.004f;
 
     [Header("Mirroring")]
     [Tooltip("When true, mirror across a fixed local X plane instead of estimating from keypoints.")]
@@ -34,10 +38,8 @@ public class ViolinKeypointRig : MonoBehaviour
 
     public static readonly string[] RequiredKeys =
     {
-        "center",
-        "neck_end",
-        "body_end",
         "chin_anchor",
+        "neck_end",
     };
 
     private static readonly string[] SupplementaryTemplateKeys =
@@ -48,15 +50,7 @@ public class ViolinKeypointRig : MonoBehaviour
         "outline_03_top_right_corner",
         "outline_04_upper_middle_body_end",
 
-        // Fingerboard drivers (right side). Left side is mirrored.
-        "fingerboard_01_bridge_right_side",
-        "fingerboard_02_nut_right_side",
-
         // String endpoints (2 points each)
-        "string_G_bridge_side",
-        "string_G_fingerboard_end",
-        "string_D_bridge_side",
-        "string_D_fingerboard_end",
         "string_A_bridge_side",
         "string_A_fingerboard_end",
         "string_E_bridge_side",
@@ -71,19 +65,26 @@ public class ViolinKeypointRig : MonoBehaviour
         new Vector3(0.03f,  0.08f, -0.035f),
         new Vector3(0.08f,  0.02f, 0.000f),
 
-        // Fingerboard driver defaults (right side)
-        new Vector3(0.05f,  0.035f, 0.000f),
-        new Vector3(0.33f,  0.035f, 0.000f),
-
         // String endpoints defaults
-        new Vector3(0.05f,  0.030f, 0.000f),
-        new Vector3(0.33f,  0.030f, 0.000f),
-        new Vector3(0.05f,  0.010f, 0.000f),
-        new Vector3(0.33f,  0.010f, 0.000f),
         new Vector3(0.05f, -0.010f, 0.000f),
         new Vector3(0.33f, -0.010f, 0.000f),
         new Vector3(0.05f, -0.030f, 0.000f),
         new Vector3(0.33f, -0.030f, 0.000f),
+    };
+
+    private static readonly string[] MirroredOnlyStringKeys =
+    {
+        "string_D_bridge_side",
+        "string_D_fingerboard_end",
+        "string_G_bridge_side",
+        "string_G_fingerboard_end",
+        // Legacy aliases
+        "string_D",
+        "string_G",
+        "string_D_1",
+        "string_D_2",
+        "string_G_1",
+        "string_G_2",
     };
 
     public Transform RootOrSelf
@@ -93,6 +94,9 @@ public class ViolinKeypointRig : MonoBehaviour
 
     public void EnsureSupplementaryTemplateKeypoints()
     {
+        // Keep mirrored string keys virtual (gizmos only), not scene objects.
+        RemoveMirroredStringSceneObjects();
+
         Transform root = RootOrSelf;
         for (int i = 0; i < SupplementaryTemplateKeys.Length; i++)
         {
@@ -121,6 +125,30 @@ public class ViolinKeypointRig : MonoBehaviour
         }
 
         existing.marker = markerObj.transform;
+    }
+
+    private void RemoveMirroredStringSceneObjects()
+    {
+        for (int i = 0; i < MirroredOnlyStringKeys.Length; i++)
+        {
+            string key = MirroredOnlyStringKeys[i];
+            KeypointBinding existing = keypoints.Find(k => string.Equals(k.key, key, StringComparison.Ordinal));
+            if (existing == null || existing.marker == null)
+            {
+                continue;
+            }
+
+            GameObject markerObj = existing.marker.gameObject;
+            existing.marker = null;
+            if (Application.isPlaying)
+            {
+                Destroy(markerObj);
+            }
+            else
+            {
+                DestroyImmediate(markerObj);
+            }
+        }
     }
 
     public bool TryBuildExport(out string json, out string error)
@@ -179,16 +207,25 @@ public class ViolinKeypointRig : MonoBehaviour
         // Preferred descriptive naming pairs.
         MirrorPair(positions, "outline_02_bottom_right_corner", "outline_06_bottom_left_corner", midX);
         MirrorPair(positions, "outline_03_top_right_corner", "outline_05_top_left_corner", midX);
-        MirrorPair(positions, "fingerboard_01_bridge_right_side", "fingerboard_04_bridge_left_side", midX);
-        MirrorPair(positions, "fingerboard_02_nut_right_side", "fingerboard_03_nut_left_side", midX);
+
+        // String symmetry pairs (right side authoritative):
+        // A <-> D and E <-> G.
+        MirrorPair(positions, "string_A_bridge_side", "string_D_bridge_side", midX);
+        MirrorPair(positions, "string_A_fingerboard_end", "string_D_fingerboard_end", midX);
+        MirrorPair(positions, "string_E_bridge_side", "string_G_bridge_side", midX);
+        MirrorPair(positions, "string_E_fingerboard_end", "string_G_fingerboard_end", midX);
+
+        // Legacy per-string keys.
+        MirrorPair(positions, "string_A", "string_D", midX);
+        MirrorPair(positions, "string_E", "string_G", midX);
+        MirrorPair(positions, "string_A_1", "string_D_1", midX);
+        MirrorPair(positions, "string_A_2", "string_D_2", midX);
+        MirrorPair(positions, "string_E_1", "string_G_1", midX);
+        MirrorPair(positions, "string_E_2", "string_G_2", midX);
 
         // Legacy naming pairs for compatibility.
         MirrorPair(positions, "outline_02", "outline_06", midX);
         MirrorPair(positions, "outline_03", "outline_05", midX);
-        MirrorPair(positions, "fingerboard_01", "fingerboard_04", midX);
-        MirrorPair(positions, "fingerboard_02", "fingerboard_03", midX);
-        MirrorPair(positions, "fingerboard_01_bridge_treble_side", "fingerboard_04_bridge_bass_side", midX);
-        MirrorPair(positions, "fingerboard_02_nut_treble_side", "fingerboard_03_nut_bass_side", midX);
     }
 
     private static void MirrorPair(Dictionary<string, Vector3> positions, string rightKey, string leftKey, float midX)
@@ -216,15 +253,19 @@ public class ViolinKeypointRig : MonoBehaviour
 
         return string.Equals(key, "outline_05_top_left_corner", StringComparison.Ordinal)
             || string.Equals(key, "outline_06_bottom_left_corner", StringComparison.Ordinal)
-            || string.Equals(key, "fingerboard_03_nut_left_side", StringComparison.Ordinal)
-            || string.Equals(key, "fingerboard_04_bridge_left_side", StringComparison.Ordinal)
+            || string.Equals(key, "string_D_bridge_side", StringComparison.Ordinal)
+            || string.Equals(key, "string_D_fingerboard_end", StringComparison.Ordinal)
+            || string.Equals(key, "string_G_bridge_side", StringComparison.Ordinal)
+            || string.Equals(key, "string_G_fingerboard_end", StringComparison.Ordinal)
+            || string.Equals(key, "string_D", StringComparison.Ordinal)
+            || string.Equals(key, "string_G", StringComparison.Ordinal)
+            || string.Equals(key, "string_D_1", StringComparison.Ordinal)
+            || string.Equals(key, "string_D_2", StringComparison.Ordinal)
+            || string.Equals(key, "string_G_1", StringComparison.Ordinal)
+            || string.Equals(key, "string_G_2", StringComparison.Ordinal)
             // Legacy names kept for compatibility.
             || string.Equals(key, "outline_05", StringComparison.Ordinal)
-            || string.Equals(key, "outline_06", StringComparison.Ordinal)
-            || string.Equals(key, "fingerboard_03", StringComparison.Ordinal)
-            || string.Equals(key, "fingerboard_04", StringComparison.Ordinal)
-            || string.Equals(key, "fingerboard_03_nut_bass_side", StringComparison.Ordinal)
-            || string.Equals(key, "fingerboard_04_bridge_bass_side", StringComparison.Ordinal);
+            || string.Equals(key, "outline_06", StringComparison.Ordinal);
     }
 
     private static Vector3 MirrorAcrossMidX(Vector3 p, float midX)
@@ -259,12 +300,8 @@ public class ViolinKeypointRig : MonoBehaviour
         // Secondary: use midpoint x from any known left-right pair.
         TryCollectPairMidX(positions, xs, "outline_02_bottom_right_corner", "outline_06_bottom_left_corner");
         TryCollectPairMidX(positions, xs, "outline_03_top_right_corner", "outline_05_top_left_corner");
-        TryCollectPairMidX(positions, xs, "fingerboard_01_bridge_right_side", "fingerboard_04_bridge_left_side");
-        TryCollectPairMidX(positions, xs, "fingerboard_02_nut_right_side", "fingerboard_03_nut_left_side");
         TryCollectPairMidX(positions, xs, "outline_02", "outline_06");
         TryCollectPairMidX(positions, xs, "outline_03", "outline_05");
-        TryCollectPairMidX(positions, xs, "fingerboard_01", "fingerboard_04");
-        TryCollectPairMidX(positions, xs, "fingerboard_02", "fingerboard_03");
 
         if (xs.Count == 0)
         {
@@ -320,35 +357,7 @@ public class ViolinKeypointRig : MonoBehaviour
 
     private static bool TryDeriveCenter(Dictionary<string, Vector3> positions, out Vector3 center)
     {
-        // Best: bridge midpoint from fingerboard bridge edge.
-        if (TryMidpoint(
-            positions,
-            out center,
-            "fingerboard_01_bridge_right_side",
-            "fingerboard_04_bridge_left_side"
-        ))
-        {
-            return true;
-        }
-
-        // Compatibility fallback for older naming.
-        if (TryMidpoint(
-            positions,
-            out center,
-            "fingerboard_01_bridge_treble_side",
-            "fingerboard_04_bridge_bass_side"
-        ))
-        {
-            return true;
-        }
-
-        // Legacy fallback.
-        if (TryMidpoint(positions, out center, "fingerboard_01", "fingerboard_04"))
-        {
-            return true;
-        }
-
-        // Fallback: average of available bridge-side string points.
+        // Average available bridge-side string points.
         List<Vector3> bridgePoints = new List<Vector3>();
         string[] strings = { "G", "D", "A", "E" };
         for (int i = 0; i < strings.Length; i++)
@@ -377,35 +386,7 @@ public class ViolinKeypointRig : MonoBehaviour
 
     private static bool TryDeriveNeckEnd(Dictionary<string, Vector3> positions, out Vector3 neckEnd)
     {
-        // Best: nut midpoint from fingerboard nut edge.
-        if (TryMidpoint(
-            positions,
-            out neckEnd,
-            "fingerboard_02_nut_right_side",
-            "fingerboard_03_nut_left_side"
-        ))
-        {
-            return true;
-        }
-
-        // Compatibility fallback for older naming.
-        if (TryMidpoint(
-            positions,
-            out neckEnd,
-            "fingerboard_02_nut_treble_side",
-            "fingerboard_03_nut_bass_side"
-        ))
-        {
-            return true;
-        }
-
-        // Legacy fallback.
-        if (TryMidpoint(positions, out neckEnd, "fingerboard_02", "fingerboard_03"))
-        {
-            return true;
-        }
-
-        // Fallback: average of string fingerboard-end points.
+        // Average string fingerboard-end points.
         List<Vector3> nutPoints = new List<Vector3>();
         string[] strings = { "G", "D", "A", "E" };
         for (int i = 0; i < strings.Length; i++)
@@ -460,6 +441,21 @@ public class ViolinKeypointRig : MonoBehaviour
 
     private static bool TryDeriveChinAnchor(Dictionary<string, Vector3> positions, out Vector3 chinAnchor)
     {
+        if (TryMidpoint(
+            positions,
+            out chinAnchor,
+            "outline_06_bottom_left_corner",
+            "outline_01_bottom_center"
+        ))
+        {
+            return true;
+        }
+
+        if (TryMidpoint(positions, out chinAnchor, "outline_06", "outline_01"))
+        {
+            return true;
+        }
+
         if (TryGetAnyPoint(positions, out chinAnchor, "chin_anchor_hint", "chin_rest_contact"))
         {
             return true;
@@ -563,45 +559,7 @@ public class ViolinKeypointRig : MonoBehaviour
         string[] stringNames = { "G", "D", "A", "E" };
 
         List<KeyValuePair<string, Vector3>> outline = CollectPrefixed(points, "outline_");
-        List<KeyValuePair<string, Vector3>> fingerboard = CollectPrefixed(points, "fingerboard_");
         bool hasBowContact = points.TryGetValue("bow_contact", out Vector3 bowContact);
-
-        HashSet<string> consumed = new HashSet<string>(StringComparer.Ordinal);
-        for (int i = 0; i < RequiredKeys.Length; i++)
-        {
-            consumed.Add(RequiredKeys[i]);
-        }
-        // Consume legacy one-point and new two-point string keys.
-        for (int i = 0; i < stringNames.Length; i++)
-        {
-            consumed.Add("string_" + stringNames[i]);
-            consumed.Add("string_" + stringNames[i] + "_1");
-            consumed.Add("string_" + stringNames[i] + "_2");
-            consumed.Add("string_" + stringNames[i] + "_bridge_side");
-            consumed.Add("string_" + stringNames[i] + "_fingerboard_end");
-        }
-        for (int i = 0; i < outline.Count; i++)
-        {
-            consumed.Add(outline[i].Key);
-        }
-        for (int i = 0; i < fingerboard.Count; i++)
-        {
-            consumed.Add(fingerboard[i].Key);
-        }
-        if (hasBowContact)
-        {
-            consumed.Add("bow_contact");
-        }
-
-        List<KeyValuePair<string, Vector3>> supplementary = new List<KeyValuePair<string, Vector3>>();
-        foreach (var kv in points)
-        {
-            if (!consumed.Contains(kv.Key))
-            {
-                supplementary.Add(kv);
-            }
-        }
-        supplementary.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
 
         StringBuilder sb = new StringBuilder();
         sb.AppendLine("{");
@@ -702,21 +660,6 @@ public class ViolinKeypointRig : MonoBehaviour
         }
         sb.AppendLine("        ],");
 
-        // Fingerboard block
-        sb.AppendLine("        \"fingerboard\": [");
-        for (int i = 0; i < fingerboard.Count; i++)
-        {
-            Vector3 p = fingerboard[i].Value;
-            string comma = i == fingerboard.Count - 1 ? string.Empty : ",";
-            sb.Append("          [")
-              .Append(FloatString(p.x)).Append(", ")
-              .Append(FloatString(p.y)).Append(", ")
-              .Append(FloatString(p.z)).Append("]")
-              .Append(comma)
-              .AppendLine();
-        }
-        sb.AppendLine("        ],");
-
         // Bow contact block
         sb.Append("        \"bow_contact\": ");
         if (hasBowContact)
@@ -725,44 +668,18 @@ public class ViolinKeypointRig : MonoBehaviour
               .Append(FloatString(bowContact.x)).Append(", ")
               .Append(FloatString(bowContact.y)).Append(", ")
               .Append(FloatString(bowContact.z)).Append("]")
-              .AppendLine(",");
+              .AppendLine();
         }
         else
         {
-            sb.AppendLine("null,");
+            sb.AppendLine("null");
         }
 
-        // Supplementary keypoints (not used by PnP)
-        sb.AppendLine("        \"supplementary_keypoints\": {");
-        for (int i = 0; i < supplementary.Count; i++)
-        {
-            var kv = supplementary[i];
-            string comma = i == supplementary.Count - 1 ? string.Empty : ",";
-            sb.Append("          \"").Append(kv.Key).Append("\": [")
-              .Append(FloatString(kv.Value.x)).Append(", ")
-              .Append(FloatString(kv.Value.y)).Append(", ")
-              .Append(FloatString(kv.Value.z)).Append("]")
-              .Append(comma)
-              .AppendLine();
-        }
-        sb.AppendLine("        }");
         sb.AppendLine("      }");
         sb.AppendLine("    }");
         sb.AppendLine("  }");
         sb.AppendLine("}");
         return sb.ToString();
-    }
-
-    private static void TryAssignNamedPoint(
-        Dictionary<string, Vector3> points,
-        Dictionary<string, Vector3> outDict,
-        string key
-    )
-    {
-        if (points.TryGetValue(key, out Vector3 value))
-        {
-            outDict[key] = value;
-        }
     }
 
     private static List<KeyValuePair<string, Vector3>> CollectPrefixed(
@@ -830,14 +747,18 @@ public class ViolinKeypointRig : MonoBehaviour
         {
             "outline_05_top_left_corner",
             "outline_06_bottom_left_corner",
-            "fingerboard_03_nut_left_side",
-            "fingerboard_04_bridge_left_side",
+            "string_D_bridge_side",
+            "string_D_fingerboard_end",
+            "string_G_bridge_side",
+            "string_G_fingerboard_end",
+            "string_D",
+            "string_G",
+            "string_D_1",
+            "string_D_2",
+            "string_G_1",
+            "string_G_2",
             "outline_05",
             "outline_06",
-            "fingerboard_03",
-            "fingerboard_04",
-            "fingerboard_03_nut_bass_side",
-            "fingerboard_04_bridge_bass_side",
         };
 
         for (int i = 0; i < mirroredLeftKeys.Length; i++)
@@ -857,5 +778,32 @@ public class ViolinKeypointRig : MonoBehaviour
             Gizmos.DrawLine(world + Vector3.left * gizmoSize, world + Vector3.right * gizmoSize);
             Gizmos.DrawLine(world + Vector3.forward * gizmoSize, world + Vector3.back * gizmoSize);
         }
+
+        if (showDerivedKeypointPreview)
+        {
+            DrawDerivedKeypointPreview(mirroredVirtual);
+        }
+    }
+
+    private void DrawDerivedKeypointPreview(Dictionary<string, Vector3> sourcePositions)
+    {
+        Dictionary<string, Vector3> preview = new Dictionary<string, Vector3>(sourcePositions, StringComparer.Ordinal);
+        DeriveRequiredKeypoints(preview);
+
+        DrawPreviewPoint(preview, "neck_end", new Color(0.35f, 1f, 0.35f, 1f));
+        DrawPreviewPoint(preview, "chin_anchor", new Color(0.2f, 0.9f, 1f, 1f));
+    }
+
+    private void DrawPreviewPoint(Dictionary<string, Vector3> points, string key, Color color)
+    {
+        if (!points.TryGetValue(key, out Vector3 local))
+        {
+            return;
+        }
+
+        Vector3 world = RootOrSelf.TransformPoint(local);
+        Gizmos.color = color;
+        Gizmos.DrawSphere(world, previewGizmoSize);
+        Gizmos.DrawWireSphere(world, previewGizmoSize * 1.15f);
     }
 }
