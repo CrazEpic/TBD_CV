@@ -13,7 +13,9 @@ def main() -> None:
     capture = cv2.VideoCapture(0)
     if not capture.isOpened():
         raise RuntimeError("Could not open camera 0")
-
+    showing_image = True
+    # showing_image = False
+    image = cv2.imread("images/image.png")
     try:
         with mp_holistic.Holistic(
             model_complexity=1,
@@ -24,7 +26,8 @@ def main() -> None:
                 ok, frame = capture.read()
                 if not ok:
                     break
-
+                if showing_image:
+                    frame = cv2.resize(image, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_AREA)
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results = holistic.process(rgb_frame)
                 state = HolisticState.from_mediapipe_results(results, timestamp=time.time())
@@ -32,7 +35,12 @@ def main() -> None:
 
                 status = f"pose={len(state.pose or [])} left={len(state.left_hand or [])} right={len(state.right_hand or [])}"
                 cv2.putText(frame, status, (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                # resized_frame = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+                # cv2.imshow("Holistic Tracking", resized_frame)
                 cv2.imshow("Holistic Tracking", frame)
+
+                if showing_image:
+                    cv2.waitKey(0)
 
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
