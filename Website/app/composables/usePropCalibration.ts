@@ -21,6 +21,7 @@ type PropCalibration = {
 
 type PropCalibrationMap = Record<PropId, PropCalibration>
 type PropParentDefaultsMap = Record<PropId, PropTransformState>
+type PropPoseMap = Record<PropId, PropTransformState>
 
 type PropMeasurement = {
 	sizeMeters: Vec3State
@@ -28,12 +29,37 @@ type PropMeasurement = {
 	zCm: number
 }
 
+type PropTransformOffset = {
+	parent: PropTransformState
+	root: PropTransformState
+}
+
+type TransformSnapshot = {
+	position: THREE.Vector3
+	rotation: THREE.Euler
+	scale: THREE.Vector3
+}
+
+type DebugPoint = {
+	name: string
+	position: [number, number, number]
+	group?: string
+}
+
 export const usePropCalibration = (sceneRef: Ref<any>) => {
 	const propParents = {
 		violin: ref<THREE.Group | null>(null),
 		bow: ref<THREE.Group | null>(null),
 	}
-	const propRoots = {
+	const propPoseParents = {
+		violin: ref<THREE.Group | null>(null),
+		bow: ref<THREE.Group | null>(null),
+	}
+	const propModelRoots = {
+		violin: ref<THREE.Group | null>(null),
+		bow: ref<THREE.Group | null>(null),
+	}
+	const propDebugRoots = {
 		violin: ref<THREE.Group | null>(null),
 		bow: ref<THREE.Group | null>(null),
 	}
@@ -41,6 +67,35 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		violin: { branchName: "", meshCount: 0 },
 		bow: { branchName: "", meshCount: 0 },
 	})
+	const baseParentSnapshots = new Map<PropId, TransformSnapshot>()
+	const baseRootSnapshots = new Map<PropId, TransformSnapshot>()
+	let violinDebugKeypointsGroup: THREE.Group | null = null
+	let violinDebugFingeringsGroup: THREE.Group | null = null
+	let violinReferenceMarkersGroup: THREE.Group | null = null
+
+	const clearDebugGroup = (group: THREE.Group | null) => {
+		if (!group) return
+		group.traverse((obj) => {
+			if (!(obj as THREE.Mesh).isMesh) return
+			const mesh = obj as THREE.Mesh
+			mesh.geometry?.dispose()
+			if (Array.isArray(mesh.material)) {
+				mesh.material.forEach((material) => material.dispose())
+			} else {
+				mesh.material?.dispose()
+			}
+		})
+		group.removeFromParent()
+	}
+
+	const clearViolinDebugMarkers = () => {
+		clearDebugGroup(violinDebugKeypointsGroup)
+		clearDebugGroup(violinDebugFingeringsGroup)
+		clearDebugGroup(violinReferenceMarkersGroup)
+		violinDebugKeypointsGroup = null
+		violinDebugFingeringsGroup = null
+		violinReferenceMarkersGroup = null
+	}
 
 	const defaultTransformState = (): PropTransformState => ({
 		position: { x: 0, y: 0, z: 0 },
@@ -64,8 +119,14 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		bow: defaultTransformState(),
 	})
 
+	const defaultPropPoseTransforms = (): PropPoseMap => ({
+		violin: defaultTransformState(),
+		bow: defaultTransformState(),
+	})
+
 	const propCalibration = ref<PropCalibrationMap>(defaultPropCalibration())
 	const propParentDefaults = ref<PropParentDefaultsMap>(defaultPropParentDefaults())
+	const propPoseTransforms = ref<PropPoseMap>(defaultPropPoseTransforms())
 
 	const cloneCalibration = () => JSON.parse(JSON.stringify(propCalibration.value)) as PropCalibrationMap
 	const cloneParentDefaults = () => JSON.parse(JSON.stringify(propParentDefaults.value)) as PropParentDefaultsMap
@@ -94,14 +155,57 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		target.scale.set(state.scale.x, state.scale.y, state.scale.z)
 	}
 
+	const snapshotTransform = (target: THREE.Object3D): TransformSnapshot => ({
+		position: target.position.clone(),
+		rotation: target.rotation.clone(),
+		scale: target.scale.clone(),
+	})
+
+	const createTransformOffset = (target: THREE.Object3D, base: TransformSnapshot): PropTransformState => ({
+		position: {
+			x: target.position.x - base.position.x,
+			y: target.position.y - base.position.y,
+			z: target.position.z - base.position.z,
+		},
+		rotationDeg: {
+			x: THREE.MathUtils.radToDeg(target.rotation.x - base.rotation.x),
+			y: THREE.MathUtils.radToDeg(target.rotation.y - base.rotation.y),
+			z: THREE.MathUtils.radToDeg(target.rotation.z - base.rotation.z),
+		},
+		scale: {
+			x: Math.abs(base.scale.x) > 1e-8 ? target.scale.x / base.scale.x : target.scale.x,
+			y: Math.abs(base.scale.y) > 1e-8 ? target.scale.y / base.scale.y : target.scale.y,
+			z: Math.abs(base.scale.z) > 1e-8 ? target.scale.z / base.scale.z : target.scale.z,
+		},
+	})
+
 	const applyParentTransform = (propId: PropId) => {
 		const parent = propParents[propId].value
 		if (!parent) return
 		applyTransformState(parent, propParentDefaults.value[propId])
 	}
 
+	const applyPoseTransform = (propId: PropId) => {
+		const parent = propPoseParents[propId].value
+		if (!parent) return
+		applyTransformState(parent, propPoseTransforms.value[propId])
+	}
+
+	const setPropPoseParent = (propId: PropId, parent: THREE.Object3D | null) => {
+		const poseParent = propPoseParents[propId].value
+		if (!poseParent) return
+
+		if (parent) {
+			parent.add(poseParent)
+		} else if (sceneRef.value) {
+			sceneRef.value.add(poseParent)
+		}
+
+		applyPoseTransform(propId)
+	}
+
 	const applyPropTransform = (propId: PropId) => {
-		const root = propRoots[propId].value
+		const root = propModelRoots[propId].value
 		if (!root) return
 
 		const cfg = propCalibration.value[propId]
@@ -126,22 +230,42 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		violinRoot.name = "ViolinRoot"
 		const bowRoot = new THREE.Group()
 		bowRoot.name = "BowRoot"
+		const violinPoseParent = new THREE.Group()
+		violinPoseParent.name = "ViolinPoseParent"
+		const bowPoseParent = new THREE.Group()
+		bowPoseParent.name = "BowPoseParent"
+		const violinDebugRoot = new THREE.Group()
+		violinDebugRoot.name = "ViolinDebugRoot"
+		const bowDebugRoot = new THREE.Group()
+		bowDebugRoot.name = "BowDebugRoot"
 		const violinParent = new THREE.Group()
 		violinParent.name = "ViolinParent"
 		const bowParent = new THREE.Group()
 		bowParent.name = "BowParent"
 
-		sceneRef.value.add(violinParent)
-		sceneRef.value.add(bowParent)
+		sceneRef.value.add(violinPoseParent)
+		sceneRef.value.add(bowPoseParent)
+		violinPoseParent.add(violinParent)
+		bowPoseParent.add(bowParent)
 		violinParent.add(violinRoot)
 		bowParent.add(bowRoot)
+		violinParent.add(violinDebugRoot)
+		bowParent.add(bowDebugRoot)
 		violinRoot.attach(violinBranch)
 		bowRoot.attach(bowBranch)
 
 		propParents.violin.value = violinParent
 		propParents.bow.value = bowParent
-		propRoots.violin.value = violinRoot
-		propRoots.bow.value = bowRoot
+		propPoseParents.violin.value = violinPoseParent
+		propPoseParents.bow.value = bowPoseParent
+		propModelRoots.violin.value = violinRoot
+		propModelRoots.bow.value = bowRoot
+		propDebugRoots.violin.value = violinDebugRoot
+		propDebugRoots.bow.value = bowDebugRoot
+		baseParentSnapshots.set("violin", snapshotTransform(violinParent))
+		baseParentSnapshots.set("bow", snapshotTransform(bowParent))
+		baseRootSnapshots.set("violin", snapshotTransform(violinRoot))
+		baseRootSnapshots.set("bow", snapshotTransform(bowRoot))
 
 		propDiagnostics.value = {
 			violin: { branchName: violinBranch.name || "(unnamed)", meshCount: countMeshes(violinBranch) },
@@ -150,8 +274,20 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 
 		applyParentTransform("violin")
 		applyParentTransform("bow")
+		applyPoseTransform("violin")
+		applyPoseTransform("bow")
 		applyPropTransform("violin")
 		applyPropTransform("bow")
+	}
+
+	const setPropPoseTransform = (propId: PropId, pose: Partial<PropTransformState>) => {
+		const current = propPoseTransforms.value[propId]
+		propPoseTransforms.value[propId] = {
+			position: { ...current.position, ...(pose.position ?? {}) },
+			rotationDeg: { ...current.rotationDeg, ...(pose.rotationDeg ?? {}) },
+			scale: { ...current.scale, ...(pose.scale ?? {}) },
+		}
+		applyPoseTransform(propId)
 	}
 
 	const setPropCalibration = (propId: PropId, calibration: Partial<PropCalibration>) => {
@@ -163,6 +299,71 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 			visible: calibration.visible ?? current.visible,
 		}
 		applyPropTransform(propId)
+	}
+
+	const buildMarkerGroup = (groupName: string, points: DebugPoint[], color: number, radius = 0.0075) => {
+		const group = new THREE.Group()
+		group.name = groupName
+
+		points.forEach((point) => {
+			const geometry = new THREE.SphereGeometry(radius, 12, 12)
+			const material = new THREE.MeshBasicMaterial({ color })
+			const marker = new THREE.Mesh(geometry, material)
+			marker.name = point.name
+			marker.position.set(point.position[0], point.position[1], point.position[2])
+			group.add(marker)
+		})
+
+		return group
+	}
+
+	const drawViolinKeypoints = (points: DebugPoint[]) => {
+		const violinDebugRoot = propDebugRoots.violin.value
+		if (!violinDebugRoot || !points.length) return
+		clearDebugGroup(violinDebugKeypointsGroup)
+		violinDebugKeypointsGroup = buildMarkerGroup("ViolinDebugKeypoints", points, 0x22d3ee, 0.003)
+		violinDebugRoot.add(violinDebugKeypointsGroup)
+	}
+
+	const drawViolinFingerings = (points: DebugPoint[]) => {
+		const violinDebugRoot = propDebugRoots.violin.value
+		if (!violinDebugRoot || !points.length) return
+		clearDebugGroup(violinDebugFingeringsGroup)
+		violinDebugFingeringsGroup = buildMarkerGroup("ViolinDebugFingerings", points, 0xef4444, 0.003)
+		violinDebugRoot.add(violinDebugFingeringsGroup)
+	}
+
+	const drawViolinReferenceMarkers = (zValues: number[] = [0.575, 0.64]) => {
+		const violinDebugRoot = propDebugRoots.violin.value
+		if (!violinDebugRoot || !zValues.length) return
+
+		clearDebugGroup(violinReferenceMarkersGroup)
+		const group = new THREE.Group()
+		group.name = "ViolinReferenceMarkers"
+
+		for (const z of zValues) {
+			if (!Number.isFinite(z)) continue
+			const marker = new THREE.Mesh(new THREE.SphereGeometry(0.014, 20, 20), new THREE.MeshBasicMaterial({ color: 0xff00ff }))
+			marker.name = `violin_ref_z_${z.toFixed(3)}`
+			marker.position.set(0, 0, z)
+			group.add(marker)
+		}
+
+		violinReferenceMarkersGroup = group
+		violinDebugRoot.add(group)
+	}
+
+	const getPropTransformOffset = (propId: PropId): PropTransformOffset | null => {
+		const parent = propParents[propId].value
+		const root = propModelRoots[propId].value
+		const baseParent = baseParentSnapshots.get(propId)
+		const baseRoot = baseRootSnapshots.get(propId)
+		if (!parent || !root || !baseParent || !baseRoot) return null
+
+		return {
+			parent: createTransformOffset(parent, baseParent),
+			root: createTransformOffset(root, baseRoot),
+		}
 	}
 
 	const setPropParentDefaults = (propId: PropId, defaults: Partial<PropTransformState>) => {
@@ -189,6 +390,8 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		propParentDefaults.value = defaults
 		applyParentTransform("violin")
 		applyParentTransform("bow")
+		applyPoseTransform("violin")
+		applyPoseTransform("bow")
 	}
 
 	const resetPropCalibration = (propId?: PropId) => {
@@ -230,7 +433,7 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 	}
 
 	const getPropMeasurement = (propId: PropId): PropMeasurement | null => {
-		const target = propRoots[propId].value
+		const target = propModelRoots[propId].value
 		if (!target) return null
 
 		const box = new THREE.Box3().setFromObject(target)
@@ -302,15 +505,24 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 	const getPropDiagnostics = () => propDiagnostics.value
 
 	const dispose = () => {
+		clearViolinDebugMarkers()
+		baseParentSnapshots.clear()
+		baseRootSnapshots.clear()
 		propParents.violin.value = null
 		propParents.bow.value = null
-		propRoots.violin.value = null
-		propRoots.bow.value = null
+		propPoseParents.violin.value = null
+		propPoseParents.bow.value = null
+		propModelRoots.violin.value = null
+		propModelRoots.bow.value = null
+		propDebugRoots.violin.value = null
+		propDebugRoots.bow.value = null
 	}
 
 	return {
 		splitViolinAndBow,
 		setPropCalibration,
+		setPropPoseParent,
+		setPropPoseTransform,
 		setPropParentDefaults,
 		getPropCalibration,
 		getPropParentDefaults,
@@ -322,6 +534,10 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		exportPropCalibration,
 		importPropCalibration,
 		getPropDiagnostics,
+		drawViolinKeypoints,
+		drawViolinFingerings,
+		drawViolinReferenceMarkers,
+		getPropTransformOffset,
 		dispose,
 	}
 }

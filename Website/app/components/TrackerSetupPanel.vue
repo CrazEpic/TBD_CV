@@ -2,17 +2,15 @@
 	<div class="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 lg:px-8">
 		<section class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur">
 			<div class="space-y-2">
-				<p class="text-xs uppercase tracking-[0.35em] text-amber-200/80">Violins and VTubers</p>
+				<p class="text-xs tracking-[0.35em] text-amber-200/80 uppercase">Violins and VTubers</p>
 				<h1 class="text-4xl font-semibold text-white md:text-5xl">Build a tracking session</h1>
-				<p class="max-w-2xl text-sm leading-6 text-slate-300">
-					Step through setup vertically. Completed steps keep a compact preview so you can quickly review your choices.
-				</p>
+				<p class="max-w-2xl text-sm leading-6 text-slate-300">Step through setup vertically. Completed steps keep a compact preview so you can quickly review your choices.</p>
 			</div>
 
 			<div class="mt-6">
 				<div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 					<div class="rounded-xl border border-white/10 bg-slate-950/40 p-3">
-						<p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Avatar</p>
+						<p class="text-[11px] tracking-[0.2em] text-slate-400 uppercase">Avatar</p>
 						<div class="mt-2 flex items-center gap-3">
 							<img v-if="selectedCharacterImage" :src="selectedCharacterImage" alt="Selected avatar" class="h-10 w-10 rounded-lg border border-white/10 object-cover" />
 							<div v-else class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-black/30 text-slate-400">
@@ -23,17 +21,17 @@
 					</div>
 
 					<div class="rounded-xl border border-white/10 bg-slate-950/40 p-3">
-						<p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Input</p>
+						<p class="text-[11px] tracking-[0.2em] text-slate-400 uppercase">Input</p>
 						<p class="mt-2 text-xs text-slate-200">{{ step2Preview }}</p>
 					</div>
 
 					<div class="rounded-xl border border-white/10 bg-slate-950/40 p-3">
-						<p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Evaluation</p>
+						<p class="text-[11px] tracking-[0.2em] text-slate-400 uppercase">Evaluation</p>
 						<p class="mt-2 text-xs text-slate-200">{{ step3Preview }}</p>
 					</div>
 
 					<div class="rounded-xl border border-white/10 bg-slate-950/40 p-3">
-						<p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Video</p>
+						<p class="text-[11px] tracking-[0.2em] text-slate-400 uppercase">Video</p>
 						<div class="mt-2 flex items-center gap-3">
 							<video
 								v-if="requiresVideoLabeling && sourceVideoUrl"
@@ -53,7 +51,12 @@
 					<template #description="{ item }">
 						<div class="space-y-2">
 							<p class="text-xs text-slate-400">{{ item.description }}</p>
-							<img v-if="Number(item.value) === 0 && selectedCharacterImage" :src="selectedCharacterImage" alt="Selected avatar" class="h-12 w-12 rounded-lg border border-white/10 object-cover" />
+							<img
+								v-if="Number(item.value) === 0 && selectedCharacterImage"
+								:src="selectedCharacterImage"
+								alt="Selected avatar"
+								class="h-12 w-12 rounded-lg border border-white/10 object-cover"
+							/>
 							<video
 								v-if="Number(item.value) === 1 && inputMode === 'video' && sourceVideoUrl"
 								:key="sourceVideoUrl"
@@ -74,20 +77,23 @@
 									:key="character.id"
 									type="button"
 									class="group overflow-hidden rounded-2xl border text-left transition"
-									:class="activeCharacterId === character.id ? 'border-amber-300 bg-amber-300/15 ring-2 ring-amber-300/70 shadow-lg shadow-amber-300/10' : 'border-white/10 bg-black/20 hover:border-white/20 hover:-translate-y-0.5'"
+									:class="
+										activeCharacterId === character.id
+											? 'border-amber-300 bg-amber-300/15 shadow-lg ring-2 shadow-amber-300/10 ring-amber-300/70'
+											: 'border-white/10 bg-black/20 hover:-translate-y-0.5 hover:border-white/20'
+									"
 									:aria-pressed="activeCharacterId === character.id"
 									@click="selectBuiltInCharacter(character)"
 								>
 									<img :src="character.image" :alt="character.name" class="aspect-square w-full object-cover transition duration-300 group-hover:scale-105" />
 									<div class="space-y-1 p-3">
 										<p class="text-sm font-medium text-white">{{ character.name }}</p>
-										<p class="text-xs text-slate-400">{{ character.description }}</p>
 									</div>
 								</button>
 							</div>
 
 							<div class="space-y-2">
-								<p class="text-xs uppercase tracking-[0.3em] text-slate-400">Custom VRM</p>
+								<p class="text-xs tracking-[0.3em] text-slate-400 uppercase">Custom VRM</p>
 								<UFileUpload
 									v-model="customModelUpload"
 									accept=".vrm,.glb,.gltf"
@@ -105,15 +111,7 @@
 					<template #input>
 						<div :ref="(el) => setStepContentRef(el, 1)" class="mt-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
 							<div class="space-y-4">
-								<URadioGroup
-									v-model="inputModeSelection"
-									:items="inputModeItems"
-									color="primary"
-									variant="card"
-									orientation="horizontal"
-									size="sm"
-									class="w-full"
-								/>
+								<URadioGroup v-model="inputModeSelection" :items="inputModeItems" color="primary" variant="card" orientation="horizontal" size="sm" class="w-full" />
 
 								<div v-if="inputModeSelection === 'video'" class="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4">
 									<div class="space-y-1">
@@ -130,14 +128,8 @@
 										class="w-full"
 										@update:model-value="onVideoUploadChange"
 									/>
-									<p class="text-xs text-slate-400">{{ sourceVideoLabel || 'No video selected yet' }}</p>
-									<video
-										v-if="sourceVideoUrl"
-										:key="sourceVideoUrl"
-										:src="sourceVideoUrl"
-										controls
-										class="w-full rounded-xl border border-white/10 bg-black/40"
-									/>
+									<p class="text-xs text-slate-400">{{ sourceVideoLabel || "No video selected yet" }}</p>
+									<video v-if="sourceVideoUrl" :key="sourceVideoUrl" :src="sourceVideoUrl" controls class="w-full rounded-xl border border-white/10 bg-black/40" />
 								</div>
 							</div>
 						</div>
@@ -145,23 +137,15 @@
 
 					<template #evaluation>
 						<div :ref="(el) => setStepContentRef(el, 2)" class="mt-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-							<URadioGroup
-								v-model="evaluationModeSelection"
-								:items="evaluationModeItems"
-								color="primary"
-								variant="card"
-								orientation="horizontal"
-								size="sm"
-								class="w-full"
-							/>
+							<URadioGroup v-model="evaluationModeSelection" :items="evaluationModeItems" color="primary" variant="card" orientation="horizontal" size="sm" class="w-full" />
 						</div>
 					</template>
 
 					<template #labeling>
 						<div :ref="(el) => setStepContentRef(el, labelingStepValue)" class="mt-3 space-y-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
 							<div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-								<p class="text-xs uppercase tracking-[0.3em] text-slate-400">Labeling preview</p>
-								<p class="mt-2 text-sm text-slate-200">{{ sourceVideoLabel || 'Use the video selected in the input step.' }}</p>
+								<p class="text-xs tracking-[0.3em] text-slate-400 uppercase">Labeling preview</p>
+								<p class="mt-2 text-sm text-slate-200">{{ sourceVideoLabel || "Use the video selected in the input step." }}</p>
 								<NoteTargetEditor context="labeling" />
 							</div>
 						</div>
@@ -170,7 +154,7 @@
 					<template #start>
 						<div :ref="(el) => setStepContentRef(el, startStepValue)" class="mt-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
 							<div class="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-slate-300">
-								<p>{{ requiresVideoLabeling && !sourceVideoUrl ? 'Upload a source video to continue.' : 'Ready to enter tracking session.' }}</p>
+								<p>{{ requiresVideoLabeling && !sourceVideoUrl ? "Upload a source video to continue." : "Ready to enter tracking session." }}</p>
 								<UButton size="lg" :disabled="!canStartSession" @click="startSession">Start session</UButton>
 							</div>
 						</div>
@@ -178,26 +162,8 @@
 				</UStepper>
 
 				<div class="mt-4 flex items-center justify-between gap-3">
-					<UButton
-						variant="outline"
-						color="neutral"
-						size="sm"
-						leading-icon="i-lucide-arrow-left"
-						:disabled="!hasPrevStep"
-						@click="goToPrevStep"
-					>
-						Back
-					</UButton>
-					<UButton
-						variant="outline"
-						color="neutral"
-						size="sm"
-						trailing-icon="i-lucide-arrow-right"
-						:disabled="!hasNextStep"
-						@click="goToNextStep"
-					>
-						Next
-					</UButton>
+					<UButton variant="outline" color="neutral" size="sm" leading-icon="i-lucide-arrow-left" :disabled="!hasPrevStep" @click="goToPrevStep"> Back </UButton>
+					<UButton variant="outline" color="neutral" size="sm" trailing-icon="i-lucide-arrow-right" :disabled="!hasNextStep" @click="goToNextStep"> Next </UButton>
 				</div>
 			</div>
 		</section>
@@ -205,52 +171,49 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
-import type { StepperItem } from '@nuxt/ui'
-import NoteTargetEditor from '~/components/NoteTargetEditor.vue'
-import { useTrackerSession } from '~/composables/useTrackerSession'
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue"
+import type { StepperItem } from "@nuxt/ui"
+import NoteTargetEditor from "~/components/NoteTargetEditor.vue"
+import { useTrackerSession } from "~/composables/useTrackerSession"
 
 const emit = defineEmits<{ start: [] }>()
 
 const session = useTrackerSession()
 const customModelUpload = ref<File | null>(null)
 const sourceVideoUpload = ref<File | null>(null)
-const inputModeSelection = ref<'webcam' | 'video' | undefined>(undefined)
-const evaluationModeSelection = ref<'none' | 'evaluation' | undefined>(undefined)
+const inputModeSelection = ref<"webcam" | "video" | undefined>(undefined)
+const evaluationModeSelection = ref<"none" | "evaluation" | undefined>(undefined)
 const stepContentRefs = new Map<number, HTMLElement>()
 
 const characters = [
 	{
-		id: 'sample-a',
-		name: 'Sample A',
-		description: 'A lightweight neutral avatar for testing.',
-		image: '/Avatar_SampleA.png',
-		model: '/Avatar_SampleA.vrm',
+		id: "sample-a",
+		name: "Sample A",
+		image: "/Avatar_SampleA.png",
+		model: "/Avatar_SampleA.vrm",
 	},
 	{
-		id: 'sample-b',
-		name: 'Sample B',
-		description: 'The default reference avatar used in previews.',
-		image: '/Avatar_SampleB.png',
-		model: '/Avatar_SampleB.vrm',
+		id: "sample-b",
+		name: "Sample B",
+		image: "/Avatar_SampleB.png",
+		model: "/Avatar_SampleB.vrm",
 	},
 	{
-		id: 'sample-c',
-		name: 'Sample C',
-		description: 'A third option for comparison sessions.',
-		image: '/Avatar_SampleC.png',
-		model: '/Avatar_SampleC.vrm',
+		id: "sample-c",
+		name: "Sample C",
+		image: "/Avatar_SampleC.png",
+		model: "/Avatar_SampleC.vrm",
 	},
 ]
 
 const inputModeItems = [
-	{ label: 'Webcam', value: 'webcam', description: 'Use live camera input' },
-	{ label: 'Video', value: 'video', description: 'Use uploaded video input' },
+	{ label: "Webcam", value: "webcam", description: "Use live camera input" },
+	{ label: "Video", value: "video", description: "Use uploaded video input" },
 ]
 
 const evaluationModeItems = [
-	{ label: 'No evaluation', value: 'none', description: 'Track without labeling notes' },
-	{ label: 'Evaluation mode', value: 'evaluation', description: 'Enable note selection and metrics' },
+	{ label: "No evaluation", value: "none", description: "Track without labeling notes" },
+	{ label: "Evaluation mode", value: "evaluation", description: "Enable note selection and metrics" },
 ]
 
 const activeCharacterId = computed(() => session.selectedCharacter.value?.id ?? null)
@@ -258,7 +221,7 @@ const hasModelSelection = computed(() => session.hasModelSelection.value)
 const inputMode = computed(() => inputModeSelection.value)
 const evaluationMode = computed(() => evaluationModeSelection.value)
 const sourceVideoUrl = computed(() => session.activeSourceVideoUrl.value)
-const requiresVideoLabeling = computed(() => inputMode.value === 'video' && evaluationMode.value === 'evaluation')
+const requiresVideoLabeling = computed(() => inputMode.value === "video" && evaluationMode.value === "evaluation")
 const isStep1Done = computed(() => hasModelSelection.value)
 const isStep2Done = computed(() => inputMode.value !== undefined)
 const isStep3Done = computed(() => evaluationMode.value !== undefined)
@@ -269,20 +232,21 @@ const startStepValue = computed(() => (requiresVideoLabeling.value ? 4 : 3))
 const displayStep = ref(0)
 const selectedCharacterImage = computed(() => session.selectedCharacter.value?.image ?? null)
 const sourceVideoLabel = computed(() => session.sourceVideoName.value)
-const step1Preview = computed(() => session.activeModelLabel.value ?? 'Choose a built-in or custom VRM')
+const step1Preview = computed(() => session.activeModelLabel.value ?? "Choose a built-in or custom VRM")
 const step2Preview = computed(() => {
-	if (inputMode.value === undefined) return 'Not selected yet'
-	return inputMode.value === 'video' ? 'Video input' : 'Webcam input'
+	if (inputMode.value === undefined) return "Not selected yet"
+	return inputMode.value === "video" ? "Video input" : "Webcam input"
 })
 const step3Preview = computed(() => {
-	if (evaluationMode.value === undefined) return 'Not selected yet'
-	return evaluationMode.value === 'evaluation' ? 'Evaluation mode enabled' : 'No evaluation'
+	if (evaluationMode.value === undefined) return "Not selected yet"
+	return evaluationMode.value === "evaluation" ? "Evaluation mode enabled" : "No evaluation"
 })
-const step4Preview = computed(() => sourceVideoLabel.value ?? 'Upload a source video to label timeline')
+const step4Preview = computed(() => sourceVideoLabel.value ?? "Upload a source video to label timeline")
 const readySummary = computed(() => {
-	const model = session.activeModelLabel.value ?? 'No model'
-	const source = inputMode.value === 'video' ? sourceVideoLabel.value ?? 'Video not selected' : inputMode.value === 'webcam' ? 'Webcam' : 'Input mode pending'
-	const evaluation = evaluationMode.value === 'evaluation' ? session.selectedNote.value?.label ?? 'Evaluation enabled' : evaluationMode.value === 'none' ? 'No evaluation' : 'Evaluation mode pending'
+	const model = session.activeModelLabel.value ?? "No model"
+	const source = inputMode.value === "video" ? (sourceVideoLabel.value ?? "Video not selected") : inputMode.value === "webcam" ? "Webcam" : "Input mode pending"
+	const evaluation =
+		evaluationMode.value === "evaluation" ? (session.selectedNote.value?.label ?? "Evaluation enabled") : evaluationMode.value === "none" ? "No evaluation" : "Evaluation mode pending"
 	return `${model} · ${source} · ${evaluation}`
 })
 const enabledStepValues = computed(() => stepperItems.value.filter((item) => !item.disabled).map((item) => Number(item.value)))
@@ -292,16 +256,16 @@ const hasNextStep = computed(() => currentStepIndex.value >= 0 && currentStepInd
 
 const stepperItems = computed<StepperItem[]>(() => {
 	const items: StepperItem[] = [
-		{ title: 'Select a VRM', description: step1Preview.value, icon: 'i-lucide-user-round', value: 0, slot: 'model' },
-		{ title: 'Select input mode', description: step2Preview.value, icon: 'i-lucide-video', value: 1, slot: 'input', disabled: !isStep1Done.value },
-		{ title: 'Select evaluation mode', description: step3Preview.value, icon: 'i-lucide-list-checks', value: 2, slot: 'evaluation', disabled: !isStep2Done.value },
+		{ title: "Select a VRM", description: step1Preview.value, icon: "i-lucide-user-round", value: 0, slot: "model" },
+		{ title: "Select input mode", description: step2Preview.value, icon: "i-lucide-video", value: 1, slot: "input", disabled: !isStep1Done.value },
+		{ title: "Select evaluation mode", description: step3Preview.value, icon: "i-lucide-list-checks", value: 2, slot: "evaluation", disabled: !isStep2Done.value },
 	]
 
 	if (requiresVideoLabeling.value) {
-		items.push({ title: 'Label video timeline', description: step4Preview.value, icon: 'i-lucide-clapperboard', value: labelingStepValue, slot: 'labeling', disabled: !isStep3Done.value })
+		items.push({ title: "Label video timeline", description: step4Preview.value, icon: "i-lucide-clapperboard", value: labelingStepValue, slot: "labeling", disabled: !isStep3Done.value })
 	}
 
-	items.push({ title: 'Start session', description: readySummary.value, icon: 'i-lucide-play', value: startStepValue.value, slot: 'start', disabled: !isReadyForStartStep.value })
+	items.push({ title: "Start session", description: readySummary.value, icon: "i-lucide-play", value: startStepValue.value, slot: "start", disabled: !isReadyForStartStep.value })
 	return items
 })
 
@@ -311,7 +275,7 @@ const setStepContentRef = (el: Element | ComponentPublicInstance | null, step: n
 		return
 	}
 
-	const maybeElement = '$el' in (el as ComponentPublicInstance) ? ((el as ComponentPublicInstance).$el as Element | null) : (el as Element)
+	const maybeElement = "$el" in (el as ComponentPublicInstance) ? ((el as ComponentPublicInstance).$el as Element | null) : (el as Element)
 	if (maybeElement instanceof HTMLElement) {
 		stepContentRefs.set(step, maybeElement)
 	}
@@ -319,7 +283,7 @@ const setStepContentRef = (el: Element | ComponentPublicInstance | null, step: n
 
 const scrollToStep = async (step: number) => {
 	await nextTick()
-	stepContentRefs.get(step)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+	stepContentRefs.get(step)?.scrollIntoView({ behavior: "smooth", block: "start" })
 }
 
 watch(enabledStepValues, (values) => {
@@ -351,7 +315,7 @@ const canStartSession = computed(() => {
 	if (!hasModelSelection.value) return false
 	if (!inputMode.value) return false
 	if (!evaluationMode.value) return false
-	if (inputMode.value === 'video') {
+	if (inputMode.value === "video") {
 		return Boolean(session.activeSourceVideoUrl.value)
 	}
 	return true
@@ -369,7 +333,7 @@ const startSession = () => {
 		return
 	}
 
-	emit('start')
+	emit("start")
 }
 
 const selectBuiltInCharacter = (character: (typeof characters)[number]) => {

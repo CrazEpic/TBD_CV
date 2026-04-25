@@ -312,6 +312,7 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		applyArms,
 		applyLegs,
 		applyHands,
+		getBone,
 		setShowBoneAxes,
 	}
 }

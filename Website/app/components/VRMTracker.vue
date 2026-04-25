@@ -3,73 +3,56 @@
 		<!-- THREE RENDERER -->
 		<div ref="rendererHost" class="h-full w-full" />
 
-		<div class="absolute left-4 top-4 z-50 flex flex-wrap gap-2 rounded-full border border-white/10 bg-black/55 px-3 py-2 text-[11px] text-slate-200 backdrop-blur">
-			<span class="rounded-full bg-white/10 px-2 py-1 uppercase tracking-[0.25em]">{{ props.inputMode }}</span>
-			<span class="rounded-full bg-white/10 px-2 py-1 uppercase tracking-[0.25em]">{{ props.evaluationMode }}</span>
-			<span class="rounded-full bg-white/10 px-2 py-1 uppercase tracking-[0.25em]">{{ props.modelPath.split('/').pop() }}</span>
+		<div class="absolute top-4 left-4 z-50 flex flex-wrap gap-2 rounded-full border border-white/10 bg-black/55 px-3 py-2 text-[11px] text-slate-200 backdrop-blur">
+			<span class="rounded-full bg-white/10 px-2 py-1 tracking-[0.25em] uppercase">{{ props.inputMode }}</span>
+			<span class="rounded-full bg-white/10 px-2 py-1 tracking-[0.25em] uppercase">{{ props.evaluationMode }}</span>
+			<span class="rounded-full bg-white/10 px-2 py-1 tracking-[0.25em] uppercase">{{ props.modelPath.split("/").pop() }}</span>
 		</div>
 
 		<NoteTargetEditor
 			v-if="props.inputMode === 'webcam' && props.evaluationMode === 'evaluation'"
 			context="live"
-			class="absolute left-4 bottom-4 z-50 w-md max-h-[70vh] overflow-auto backdrop-blur"
+			class="absolute bottom-4 left-4 z-50 max-h-[70vh] w-md overflow-auto backdrop-blur"
 		/>
 
-<!-- DEBUG CONTROLS -->
-	<div class="absolute top-4 right-4 z-50 flex gap-2">
-		<UButton
-			:icon="showBoneAxes ? 'i-lucide-check' : 'i-lucide-plus'"
-			:color="showBoneAxes ? 'success' : 'neutral'"
-			variant="outline"
-			@click="toggleBoneAxes"
-		>
-			Axes
-		</UButton>
-		<UButton
-			:icon="showWireframe ? 'i-lucide-check' : 'i-lucide-plus'"
-			:color="showWireframe ? 'success' : 'neutral'"
-			variant="outline"
-			@click="toggleWireframe"
-		>
-			Wireframe
-		</UButton>
-		<UButton :icon="showCalibration ? 'i-lucide-sliders-horizontal' : 'i-lucide-sliders'" variant="outline" @click="toggleCalibration">
-			Calibration
-		</UButton>
+		<!-- DEBUG CONTROLS -->
+		<div class="absolute top-4 right-4 z-50 flex gap-2">
+			<UButton :icon="showBoneAxes ? 'i-lucide-check' : 'i-lucide-plus'" :color="showBoneAxes ? 'success' : 'neutral'" variant="outline" @click="toggleBoneAxes"> Axes </UButton>
+			<UButton :icon="showWireframe ? 'i-lucide-check' : 'i-lucide-plus'" :color="showWireframe ? 'success' : 'neutral'" variant="outline" @click="toggleWireframe"> Wireframe </UButton>
+			<UButton :icon="showCalibration ? 'i-lucide-sliders-horizontal' : 'i-lucide-sliders'" variant="outline" @click="toggleCalibration"> Calibration </UButton>
 			<UButton icon="i-lucide-log-out" color="error" variant="outline" @click="$emit('quit')"> Quit </UButton>
 		</div>
 
-		<div
-			v-if="showCalibration"
-			class="absolute top-16 right-4 z-50 w-96 max-h-[70vh] overflow-auto rounded-lg border border-white/10 bg-black/75 p-4 shadow-lg backdrop-blur"
-		>
+		<div v-if="showCalibration" class="absolute top-16 right-4 z-50 max-h-[70vh] w-96 overflow-auto rounded-lg border border-white/10 bg-black/75 p-4 shadow-lg backdrop-blur">
 			<div class="mb-3 flex items-center justify-between">
 				<h3 class="text-sm font-semibold text-white">Prop Calibration</h3>
 				<UButton size="xs" variant="outline" @click="syncCalibration">Reload</UButton>
 			</div>
 
 			<div class="mb-3 grid grid-cols-2 gap-2">
-				<UButton :color="selectedProp === 'violin' ? 'primary' : 'neutral'" size="xs" variant="outline" @click="selectedProp = 'violin'">
-					Violin
-				</UButton>
-				<UButton :color="selectedProp === 'bow' ? 'primary' : 'neutral'" size="xs" variant="outline" @click="selectedProp = 'bow'">
-					Bow
-				</UButton>
+				<UButton :color="selectedProp === 'violin' ? 'primary' : 'neutral'" size="xs" variant="outline" @click="selectedProp = 'violin'"> Violin </UButton>
+				<UButton :color="selectedProp === 'bow' ? 'primary' : 'neutral'" size="xs" variant="outline" @click="selectedProp = 'bow'"> Bow </UButton>
 			</div>
 
 			<div v-if="calibration" class="space-y-3 text-xs text-gray-200">
 				<div class="rounded border border-white/10 p-2">
 					<div class="mb-2 font-medium text-white">Position</div>
 					<div v-for="axis in axes" :key="`p-${axis}`" class="mb-2">
-						<div class="mb-1">{{ axis.toUpperCase() }}</div>
-						<input
-							type="number"
-							min="-3"
-							max="3"
-							step="0.001"
-							class="w-full rounded border border-white/20 bg-black/40 p-2 text-[11px]"
-							:value="getTransformValue('position', axis)"
-							@input="setTransformValue('position', axis, Number(($event.target as HTMLInputElement).value))"
+						<div class="mb-1 flex items-center justify-between">
+							<button
+								type="button"
+								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-cyan-300"
+								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'calibration', section: 'position', axis, propId: selectedProp })"
+							>
+								{{ axis.toUpperCase() }} (drag)
+							</button>
+							<span class="text-[10px] text-gray-400">{{ getTransformValue('position', axis).toFixed(3) }}</span>
+						</div>
+						<UInputNumber
+							:step="0.001"
+							:format-options="{ style: 'decimal' }"
+							:model-value="getTransformValue('position', axis)"
+							@update:model-value="(value) => setTransformValue('position', axis, toFiniteNumber(value, getTransformValue('position', axis)))"
 						/>
 					</div>
 				</div>
@@ -77,15 +60,21 @@
 				<div class="rounded border border-white/10 p-2">
 					<div class="mb-2 font-medium text-white">Rotation (deg)</div>
 					<div v-for="axis in axes" :key="`r-${axis}`" class="mb-2">
-						<div class="mb-1">{{ axis.toUpperCase() }}</div>
-						<input
-							type="number"
-							min="-180"
-							max="180"
-							step="0.1"
-							class="w-full rounded border border-white/20 bg-black/40 p-2 text-[11px]"
-							:value="getTransformValue('rotationDeg', axis)"
-							@input="setTransformValue('rotationDeg', axis, Number(($event.target as HTMLInputElement).value))"
+						<div class="mb-1 flex items-center justify-between">
+							<button
+								type="button"
+								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-orange-300"
+								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'calibration', section: 'rotationDeg', axis, propId: selectedProp })"
+							>
+								{{ axis.toUpperCase() }} (drag)
+							</button>
+							<span class="text-[10px] text-gray-400">{{ getTransformValue('rotationDeg', axis).toFixed(1) }}</span>
+						</div>
+						<UInputNumber
+							:step="0.1"
+							:format-options="{ style: 'decimal' }"
+							:model-value="getTransformValue('rotationDeg', axis)"
+							@update:model-value="(value) => setTransformValue('rotationDeg', axis, toFiniteNumber(value, getTransformValue('rotationDeg', axis)))"
 						/>
 					</div>
 				</div>
@@ -93,15 +82,21 @@
 				<div class="rounded border border-white/10 p-2">
 					<div class="mb-2 font-medium text-white">Scale</div>
 					<div v-for="axis in axes" :key="`s-${axis}`" class="mb-2">
-						<div class="mb-1">{{ axis.toUpperCase() }}</div>
-						<input
-							type="number"
-							min="0.01"
-							max="4"
-							step="0.001"
-							class="w-full rounded border border-white/20 bg-black/40 p-2 text-[11px]"
-							:value="getTransformValue('scale', axis)"
-							@input="setTransformValue('scale', axis, Number(($event.target as HTMLInputElement).value))"
+						<div class="mb-1 flex items-center justify-between">
+							<button
+								type="button"
+								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-lime-300"
+								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'calibration', section: 'scale', axis, propId: selectedProp })"
+							>
+								{{ axis.toUpperCase() }} (drag)
+							</button>
+							<span class="text-[10px] text-gray-400">{{ getTransformValue('scale', axis).toFixed(3) }}</span>
+						</div>
+						<UInputNumber
+							:step="0.001"
+							:format-options="{ style: 'decimal' }"
+							:model-value="getTransformValue('scale', axis)"
+							@update:model-value="(value) => setTransformValue('scale', axis, toFiniteNumber(value, getTransformValue('scale', axis)))"
 						/>
 					</div>
 				</div>
@@ -109,15 +104,21 @@
 				<div class="rounded border border-white/10 p-2">
 					<div class="mb-2 font-medium text-white">Parent Defaults (Base Transform)</div>
 					<div v-for="axis in axes" :key="`pp-${axis}`" class="mb-2">
-						<div class="mb-1">Position {{ axis.toUpperCase() }}</div>
-						<input
-							type="number"
-							min="-3"
-							max="3"
-							step="0.001"
-							class="w-full rounded border border-white/20 bg-black/40 p-2 text-[11px]"
-							:value="getParentValue('position', axis)"
-							@input="setParentValue('position', axis, Number(($event.target as HTMLInputElement).value))"
+						<div class="mb-1 flex items-center justify-between">
+							<button
+								type="button"
+								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-fuchsia-300"
+								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'parent', section: 'position', axis, propId: selectedProp })"
+							>
+								Position {{ axis.toUpperCase() }} (drag)
+							</button>
+							<span class="text-[10px] text-gray-400">{{ getParentValue('position', axis).toFixed(3) }}</span>
+						</div>
+						<UInputNumber
+							:step="0.001"
+							:format-options="{ style: 'decimal' }"
+							:model-value="getParentValue('position', axis)"
+							@update:model-value="(value) => setParentValue('position', axis, toFiniteNumber(value, getParentValue('position', axis)))"
 						/>
 					</div>
 					<div class="mb-2 grid grid-cols-2 gap-2">
@@ -133,19 +134,17 @@
 						<UButton size="xs" variant="outline" @click="syncCalibration">Measure Now</UButton>
 					</div>
 					<div class="mb-2 grid grid-cols-[1fr_auto] items-center gap-2">
-						<input v-model.number="targetViolinCm" type="number" step="0.1" class="w-full rounded border border-white/20 bg-black/40 p-2 text-[11px]" />
+						<UInputNumber v-model="targetViolinCm" :step="0.1" :format-options="{ style: 'decimal' }" />
 						<UButton size="xs" variant="outline" @click="fitViolinToTarget">Fit Violin (cm)</UButton>
 					</div>
 					<div class="grid grid-cols-[1fr_auto] items-center gap-2">
-						<input v-model.number="targetBowCm" type="number" step="0.1" class="w-full rounded border border-white/20 bg-black/40 p-2 text-[11px]" />
+						<UInputNumber v-model="targetBowCm" :step="0.1" :format-options="{ style: 'decimal' }" />
 						<UButton size="xs" variant="outline" @click="fitBowToTarget">Fit Bow (cm)</UButton>
 					</div>
 				</div>
 
 				<div class="flex items-center justify-between">
-					<UButton size="xs" variant="outline" @click="togglePropVisibility">
-						{{ getSelectedCalibration()?.visible ? 'Hide' : 'Show' }} {{ selectedProp }}
-					</UButton>
+					<UButton size="xs" variant="outline" @click="togglePropVisibility"> {{ getSelectedCalibration()?.visible ? "Hide" : "Show" }} {{ selectedProp }} </UButton>
 					<UButton size="xs" variant="outline" @click="resetSelectedProp">Reset {{ selectedProp }}</UButton>
 				</div>
 
@@ -155,8 +154,21 @@
 					<div>Bow: {{ diagnostics.bow.branchName }} ({{ diagnostics.bow.meshCount }} meshes)</div>
 				</div>
 
+				<div v-if="transformOffset" class="rounded border border-white/10 p-2 text-[11px] text-gray-300">
+					<div class="font-medium text-white">Current Offset From Base ({{ selectedProp }})</div>
+					<div>
+						Parent pos: {{ formatVec3(transformOffset.parent.position, 3) }} | rot: {{ formatVec3(transformOffset.parent.rotationDeg, 1) }} | scale: {{ formatVec3(transformOffset.parent.scale, 3) }}
+					</div>
+					<div>
+						Root pos: {{ formatVec3(transformOffset.root.position, 3) }} | rot: {{ formatVec3(transformOffset.root.rotationDeg, 1) }} | scale: {{ formatVec3(transformOffset.root.scale, 3) }}
+					</div>
+				</div>
+
 				<div class="rounded border border-white/10 p-2">
 					<div class="mb-2 font-medium text-white">Calibration JSON</div>
+					<p class="mb-2 text-[11px] text-gray-400">
+						Default load path: <span class="text-gray-200">public/violinCalibration/prop-calibration.json</span>
+					</p>
 					<div class="mb-2 flex gap-2">
 						<UButton size="xs" variant="outline" @click="exportCalibration">Export</UButton>
 						<UButton size="xs" variant="outline" @click="importCalibration">Import</UButton>
@@ -208,7 +220,7 @@
 		<!-- CAMERA PREVIEW -->
 		<div class="absolute right-4 bottom-4 w-70 overflow-hidden rounded-lg border border-white/10 bg-black shadow-lg">
 			<video ref="videoElement" :controls="props.inputMode === 'video'" autoplay playsinline class="w-full" />
-			<canvas ref="guideCanvas" class="absolute inset-0 w-full pointer-events-none" />
+			<canvas ref="guideCanvas" class="pointer-events-none absolute inset-0 w-full" />
 			<div v-if="props.inputMode === 'video' && !props.sourceVideoUrl" class="absolute inset-x-0 bottom-0 bg-black/70 p-3 text-xs text-slate-300">
 				Upload a source video to enable frame-by-frame analysis.
 			</div>
@@ -217,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue"
+import { ref, onMounted, onUnmounted, watch } from "vue"
 
 import { useThreeScene } from "@/composables/useThreeScene"
 import { useMediaPipeHolistic } from "@/composables/useMediaPipeHolistic"
@@ -225,6 +237,7 @@ import { useTrackerState } from "@/composables/useTrackerState"
 import { usePoseStream } from "@/composables/usePoseStream"
 import { useVRMRig } from "@/composables/useVRMRig"
 import { useTrackerPipeline } from "@/composables/useTrackerPipeline"
+import { useViolinPose } from "@/composables/useViolinPose"
 import { useRuntimeConfig } from "#app"
 import NoteTargetEditor from "@/components/NoteTargetEditor.vue"
 
@@ -243,7 +256,7 @@ const props = withDefaults(
 		sourceVideoUrl: null,
 		debugMode: false,
 		smoothFactor: 15,
-	},
+	}
 )
 defineEmits(["quit"])
 
@@ -258,12 +271,21 @@ type PropId = "violin" | "bow"
 type Axis = "x" | "y" | "z"
 const axes: Axis[] = ["x", "y", "z"]
 const selectedProp = ref<PropId>("violin")
+type TransformSection = "position" | "rotationDeg" | "scale"
+type ScrubScope = "calibration" | "parent"
+type CalibrationScrubBinding = {
+	scope: ScrubScope
+	section: TransformSection
+	axis: Axis
+	propId: PropId
+}
 
 const tracker = useTrackerState()
 const three = useThreeScene(rendererHost)
 const mp = useMediaPipeHolistic(videoElement, guideCanvas)
 const pose = usePoseStream()
 const pipeline = useTrackerPipeline()
+const violinPose = useViolinPose()
 
 type CalibrationMap = ReturnType<typeof three.getPropCalibration>
 type ParentDefaultsMap = ReturnType<typeof three.getPropParentDefaults>
@@ -273,8 +295,23 @@ const parentDefaults = ref<ParentDefaultsMap | null>(null)
 const calibrationJson = ref("")
 const diagnostics = ref(three.getPropDiagnostics())
 const measurements = ref<Record<PropId, PropMeasurement | null>>({ violin: null, bow: null })
+const transformOffset = ref<ReturnType<typeof three.getPropTransformOffset> | null>(null)
 const targetViolinCm = ref(57.5)
 const targetBowCm = ref(64)
+
+const SCRUB_SENSITIVITY: Record<TransformSection, number> = {
+	position: 0.002,
+	rotationDeg: 0.2,
+	scale: 0.002,
+}
+const SCRUB_STEP: Record<TransformSection, number> = {
+	position: 0.001,
+	rotationDeg: 0.1,
+	scale: 0.001,
+}
+
+let scrubMoveListener: ((event: PointerEvent) => void) | null = null
+let scrubUpListener: (() => void) | null = null
 
 let vrmRig: any = null
 
@@ -287,6 +324,10 @@ pipeline.registerStage("pose-state", (frame) => {
 
 pipeline.registerStage("vrm-rig", (frame) => {
 	vrmRig?.update(frame.results)
+	const nextPose = violinPose.estimate(vrmRig)
+	if (nextPose) {
+		three.setPropPoseTransform("violin", nextPose)
+	}
 	return frame
 })
 
@@ -311,29 +352,44 @@ const syncCalibration = () => {
 	calibration.value = three.getPropCalibration()
 	parentDefaults.value = three.getPropParentDefaults()
 	diagnostics.value = three.getPropDiagnostics()
+	transformOffset.value = three.getPropTransformOffset(selectedProp.value)
 	measurements.value = {
 		violin: three.getPropMeasurement("violin"),
 		bow: three.getPropMeasurement("bow"),
 	}
 }
 
-const getSelectedCalibration = () => {
-	return calibration.value?.[selectedProp.value] ?? null
+const toFiniteNumber = (value: unknown, fallback = 0) => {
+	if (typeof value === "number" && Number.isFinite(value)) return value
+	const parsed = Number(value)
+	return Number.isFinite(parsed) ? parsed : fallback
 }
 
-const getTransformValue = (section: "position" | "rotationDeg" | "scale", axis: Axis) => {
-	return getSelectedCalibration()?.[section][axis] ?? 0
+const roundToStep = (value: number, step: number) => {
+	if (step <= 0) return value
+	return Math.round(value / step) * step
 }
 
-const getParentValue = (section: "position" | "rotationDeg" | "scale", axis: Axis) => {
-	return parentDefaults.value?.[selectedProp.value]?.[section][axis] ?? 0
+const getSelectedCalibration = (propId: PropId = selectedProp.value) => {
+	return calibration.value?.[propId] ?? null
 }
 
-const setParentValue = (section: "position" | "rotationDeg" | "scale", axis: Axis, value: number) => {
+const getTransformValue = (section: TransformSection, axis: Axis, propId: PropId = selectedProp.value) => {
+	return getSelectedCalibration(propId)?.[section][axis] ?? 0
+}
+
+const getParentValue = (section: TransformSection, axis: Axis, propId: PropId = selectedProp.value) => {
+	return parentDefaults.value?.[propId]?.[section][axis] ?? 0
+}
+
+const setParentValue = (section: TransformSection, axis: Axis, value: number, propId: PropId = selectedProp.value) => {
 	if (!parentDefaults.value) return
-	const next = parentDefaults.value[selectedProp.value]
-	next[section][axis] = value
-	three.setPropParentDefaults(selectedProp.value, next)
+	const current = parentDefaults.value[propId]
+	const updated = {
+		...current,
+		[section]: { ...current[section], [axis]: value },
+	}
+	three.setPropParentDefaults(propId, updated)
 	syncCalibration()
 }
 
@@ -341,12 +397,70 @@ const getSelectedMeasurementCm = () => {
 	return measurements.value[selectedProp.value]?.zCm ?? 0
 }
 
-const setTransformValue = (section: "position" | "rotationDeg" | "scale", axis: Axis, value: number) => {
+const setTransformValue = (section: TransformSection, axis: Axis, value: number, propId: PropId = selectedProp.value) => {
 	if (!calibration.value) return
-	const next = calibration.value[selectedProp.value]
-	next[section][axis] = value
-	three.setPropCalibration(selectedProp.value, next)
+	const current = calibration.value[propId]
+	const updated = {
+		...current,
+		[section]: { ...current[section], [axis]: value },
+	}
+	three.setPropCalibration(propId, updated)
 	syncCalibration()
+}
+
+const applyScrubDelta = (binding: CalibrationScrubBinding, deltaPixels: number) => {
+	const current =
+		binding.scope === "parent"
+			? getParentValue(binding.section, binding.axis, binding.propId)
+			: getTransformValue(binding.section, binding.axis, binding.propId)
+	const raw = current + deltaPixels * SCRUB_SENSITIVITY[binding.section]
+	const next = roundToStep(raw, SCRUB_STEP[binding.section])
+	if (binding.scope === "parent") {
+		setParentValue(binding.section, binding.axis, next, binding.propId)
+		return
+	}
+	setTransformValue(binding.section, binding.axis, next, binding.propId)
+}
+
+const stopCalibrationScrub = () => {
+	if (scrubMoveListener) {
+		window.removeEventListener("pointermove", scrubMoveListener)
+		scrubMoveListener = null
+	}
+	if (scrubUpListener) {
+		window.removeEventListener("pointerup", scrubUpListener)
+		window.removeEventListener("pointercancel", scrubUpListener)
+		scrubUpListener = null
+	}
+}
+
+const startCalibrationScrub = (event: PointerEvent, binding: CalibrationScrubBinding) => {
+	const startX = event.clientX
+	let previousDelta = 0
+
+	stopCalibrationScrub()
+	if (event.target instanceof Element) {
+		event.target.setPointerCapture?.(event.pointerId)
+	}
+
+	scrubMoveListener = (moveEvent: PointerEvent) => {
+		const absoluteDelta = moveEvent.clientX - startX
+		const stepDelta = absoluteDelta - previousDelta
+		previousDelta = absoluteDelta
+		applyScrubDelta(binding, stepDelta)
+	}
+
+	scrubUpListener = () => {
+		stopCalibrationScrub()
+	}
+
+	window.addEventListener("pointermove", scrubMoveListener)
+	window.addEventListener("pointerup", scrubUpListener)
+	window.addEventListener("pointercancel", scrubUpListener)
+}
+
+const formatVec3 = (value: Record<Axis, number>, precision = 3) => {
+	return `x:${value.x.toFixed(precision)} y:${value.y.toFixed(precision)} z:${value.z.toFixed(precision)}`
 }
 
 const togglePropVisibility = () => {
@@ -395,21 +509,29 @@ const importCalibration = () => {
 	}
 }
 
+watch(selectedProp, () => {
+	syncCalibration()
+})
+
 onMounted(async () => {
 	const config = useRuntimeConfig()
 	const base = config.app.baseURL || "/"
+	const defaultCalibrationUrl = `${base}violinCalibration/prop-calibration.json`
 
 	// 1. Scene
 	tracker.setStep(0)
 	await three.init()
+	try {
+		await three.loadPropCalibrationFromUrl(defaultCalibrationUrl)
+	} catch {
+		// Optional default file; continue with built-in defaults when not present.
+	}
 	syncCalibration()
 
 	// 2. VRM
 	tracker.setStep(1)
 	// Use blob URLs directly, otherwise prepend base for public folder assets
-	const modelUrl = props.modelPath.startsWith("blob:") || props.modelPath.startsWith("http")
-		? props.modelPath
-		: `${base}${props.modelPath}`
+	const modelUrl = props.modelPath.startsWith("blob:") || props.modelPath.startsWith("http") ? props.modelPath : `${base}${props.modelPath}`
 	vrm = await three.loadVRM(modelUrl)
 
 	vrmRig = useVRMRig(vrm, {
@@ -417,26 +539,25 @@ onMounted(async () => {
 		smoothFactor: props.smoothFactor,
 		showBoneAxes: showBoneAxes.value,
 	})
+	three.setPropPoseParent("bow", vrmRig.getBone("RightHand") ?? null)
 
 	// 3. MediaPipe
 	tracker.setStep(2)
 	await mp.init(base)
 
 	mp.setOnResults((results) => {
-			void pipeline.process({
-				results,
-				timestamp: performance.now(),
+		void pipeline.process({
+			results,
+			timestamp: performance.now(),
 			source: props.inputMode ?? "webcam",
-			})
+		})
 	})
 
 	// 4. Camera
 	tracker.setStep(3)
 	if (props.inputMode === "video" && props.sourceVideoUrl && videoElement.value) {
 		// Use blob URLs directly, otherwise prepend base for public folder assets
-		const videoUrl = props.sourceVideoUrl.startsWith("blob:") || props.sourceVideoUrl.startsWith("http")
-			? props.sourceVideoUrl
-			: `${base}${props.sourceVideoUrl}`
+		const videoUrl = props.sourceVideoUrl.startsWith("blob:") || props.sourceVideoUrl.startsWith("http") ? props.sourceVideoUrl : `${base}${props.sourceVideoUrl}`
 		videoElement.value.src = videoUrl
 	}
 	await mp.start(props.inputMode)
@@ -447,6 +568,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+	stopCalibrationScrub()
 	three.dispose()
 	mp.stop()
 })
