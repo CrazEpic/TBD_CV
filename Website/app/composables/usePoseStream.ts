@@ -1,5 +1,6 @@
 import { reactive } from "vue"
 import { type HolisticResults, type LandmarkPoint, HandLandmark, PoseLandmark, getHandLandmark, getPoseLandmark } from "@/utils/landmarks"
+import { normalizeHolisticResults } from "@/utils/landmarkTransforms"
 
 // mediapipe
 // (from camera perspective)
@@ -17,20 +18,14 @@ export const usePoseStream = () => {
 	})
 
 	const update = (results: HolisticResults) => {
-		const flipX = 1
-		const flipY = -1
-		const flipZ = -1
-		results.poseLandmarks = results.poseLandmarks?.map((lm) => ({ ...lm, x: lm.x * flipX, y: lm.y * flipY, z: lm.z * flipZ })) ?? null
-		results.leftHandLandmarks = results.leftHandLandmarks?.map((lm) => ({ ...lm, x: lm.x * flipX, y: lm.y * flipY, z: lm.z * flipZ })) ?? null
-		results.rightHandLandmarks = results.rightHandLandmarks?.map((lm) => ({ ...lm, x: lm.x * flipX, y: lm.y * flipY, z: lm.z * flipZ })) ?? null
-		results.faceLandmarks = results.faceLandmarks?.map((lm) => ({ ...lm, x: lm.x * flipX, y: lm.y * flipY, z: lm.z * flipZ })) ?? null
+		const normalized = normalizeHolisticResults(results)
 
-		state.pose = results.poseLandmarks
+		state.pose = normalized.poseLandmarks
 		state.hands = {
-			left: results.leftHandLandmarks,
-			right: results.rightHandLandmarks,
+			left: normalized.leftHandLandmarks,
+			right: normalized.rightHandLandmarks,
 		}
-		state.face = results.faceLandmarks
+		state.face = normalized.faceLandmarks
 	}
 
 	const getPose = (landmark: PoseLandmark) => {

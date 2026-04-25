@@ -5,6 +5,7 @@ import { Camera } from "@mediapipe/camera_utils"
 export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 	const holistic = shallowRef<Holistic | null>(null)
 	let camera: Camera | null = null
+	let videoLoopId = 0
 
 	let onResultsCallback: ((results: Results) => void) | null = null
 
@@ -74,6 +75,14 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 		canvasCtx.restore()
 	}
 
+	const sendFrame = async (image: CanvasImageSource) => {
+		if (!holistic.value) {
+			return
+		}
+
+		await holistic.value.send({ image })
+	}
+
 	const init = async (baseUrl: string) => {
 		holistic.value = new Holistic({
 			locateFile: (file) => `${baseUrl}mediapipe/holistic/${file}`,
@@ -93,7 +102,7 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 		})
 	}
 
-	const start = async () => {
+	const startWebcam = async () => {
 		if (!videoRef.value) return
 
 		camera = new Camera(videoRef.value, {
@@ -101,7 +110,7 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 			height: 480,
 			onFrame: async () => {
 				if (holistic.value && videoRef.value) {
-					await holistic.value.send({ image: videoRef.value })
+					await sendFrame(videoRef.value)
 				}
 			},
 		})
@@ -109,8 +118,45 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 		camera.start()
 	}
 
+	const startVideoLoop = async () => {
+		if (!videoRef.value) return
+
+		const loop = async () => {
+			if (!holistic.value || !videoRef.value) {
+				return
+			}
+
+			if (!videoRef.value.paused && !videoRef.value.ended) {
+				await sendFrame(videoRef.value)
+			}
+
+			videoLoopId = requestAnimationFrame(loop)
+		}
+
+		if (videoLoopId) {
+			cancelAnimationFrame(videoLoopId)
+		}
+		videoLoopId = requestAnimationFrame(loop)
+	}
+
+	const start = async (mode: "webcam" | "video" = "webcam") => {
+		if (mode === "video") {
+			return startVideoLoop()
+		}
+
+		return startWebcam()
+	}
+
+	const stopVideoLoop = () => {
+		if (!videoLoopId) return
+		cancelAnimationFrame(videoLoopId)
+		videoLoopId = 0
+	}
+
 	const stop = () => {
 		camera?.stop?.()
+		camera = null
+		stopVideoLoop()
 		holistic.value?.close?.()
 	}
 
@@ -118,6 +164,9 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 		holistic,
 		init,
 		start,
+		startWebcam,
+		startVideoLoop,
+		sendFrame,
 		stop,
 		setOnResults,
 	}

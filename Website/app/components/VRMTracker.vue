@@ -3,6 +3,18 @@
 		<!-- THREE RENDERER -->
 		<div ref="rendererHost" class="h-full w-full" />
 
+		<div class="absolute left-4 top-4 z-50 flex flex-wrap gap-2 rounded-full border border-white/10 bg-black/55 px-3 py-2 text-[11px] text-slate-200 backdrop-blur">
+			<span class="rounded-full bg-white/10 px-2 py-1 uppercase tracking-[0.25em]">{{ props.inputMode }}</span>
+			<span class="rounded-full bg-white/10 px-2 py-1 uppercase tracking-[0.25em]">{{ props.evaluationMode }}</span>
+			<span class="rounded-full bg-white/10 px-2 py-1 uppercase tracking-[0.25em]">{{ props.modelPath.split('/').pop() }}</span>
+		</div>
+
+		<NoteTargetEditor
+			v-if="props.inputMode === 'webcam' && props.evaluationMode === 'evaluation'"
+			context="live"
+			class="absolute left-4 bottom-4 z-50 w-md max-h-[70vh] overflow-auto backdrop-blur"
+		/>
+
 <!-- DEBUG CONTROLS -->
 	<div class="absolute top-4 right-4 z-50 flex gap-2">
 		<UButton
@@ -195,8 +207,11 @@
 
 		<!-- CAMERA PREVIEW -->
 		<div class="absolute right-4 bottom-4 w-70 overflow-hidden rounded-lg border border-white/10 bg-black shadow-lg">
-			<video ref="videoElement" autoplay muted playsinline class="w-full scale-x-[-1]" />
+			<video ref="videoElement" :controls="props.inputMode === 'video'" autoplay muted playsinline class="w-full scale-x-[-1]" />
 			<canvas ref="guideCanvas" class="absolute inset-0 w-full scale-x-[-1]" />
+			<div v-if="props.inputMode === 'video' && !props.sourceVideoUrl" class="absolute inset-x-0 bottom-0 bg-black/70 p-3 text-xs text-slate-300">
+				Upload a source video to enable frame-by-frame analysis.
+			</div>
 		</div>
 	</div>
 </template>
@@ -209,12 +224,27 @@ import { useMediaPipeHolistic } from "@/composables/useMediaPipeHolistic"
 import { useTrackerState } from "@/composables/useTrackerState"
 import { usePoseStream } from "@/composables/usePoseStream"
 import { useVRMRig } from "@/composables/useVRMRig"
+import { useTrackerPipeline } from "@/composables/useTrackerPipeline"
 import { useRuntimeConfig } from "#app"
+import NoteTargetEditor from "@/components/NoteTargetEditor.vue"
 
-const props = withDefaults(defineProps<{ modelPath: string; debugMode?: boolean; smoothFactor?: number }>(), {
-	debugMode: false,
-	smoothFactor: 15,
-})
+const props = withDefaults(
+	defineProps<{
+		modelPath: string
+		inputMode?: "webcam" | "video"
+		evaluationMode?: "none" | "evaluation"
+		sourceVideoUrl?: string | null
+		debugMode?: boolean
+		smoothFactor?: number
+	}>(),
+	{
+		inputMode: "webcam",
+		evaluationMode: "none",
+		sourceVideoUrl: null,
+		debugMode: false,
+		smoothFactor: 15,
+	},
+)
 defineEmits(["quit"])
 
 const rendererHost = ref()
@@ -233,6 +263,7 @@ const tracker = useTrackerState()
 const three = useThreeScene(rendererHost)
 const mp = useMediaPipeHolistic(videoElement, guideCanvas)
 const pose = usePoseStream()
+const pipeline = useTrackerPipeline()
 
 type CalibrationMap = ReturnType<typeof three.getPropCalibration>
 type ParentDefaultsMap = ReturnType<typeof three.getPropParentDefaults>
@@ -248,6 +279,16 @@ const targetBowCm = ref(64)
 let vrmRig: any = null
 
 let vrm: any = null
+
+pipeline.registerStage("pose-state", (frame) => {
+	pose.update(frame.results)
+	return frame
+})
+
+pipeline.registerStage("vrm-rig", (frame) => {
+	vrmRig?.update(frame.results)
+	return frame
+})
 
 const toggleBoneAxes = () => {
 	showBoneAxes.value = !showBoneAxes.value
@@ -378,13 +419,19 @@ onMounted(async () => {
 	await mp.init(base)
 
 	mp.setOnResults((results) => {
-		pose.update(results)
-		vrmRig?.update(results)
+			void pipeline.process({
+				results,
+				timestamp: performance.now(),
+			source: props.inputMode ?? "webcam",
+			})
 	})
 
 	// 4. Camera
 	tracker.setStep(3)
-	await mp.start()
+	if (props.inputMode === "video" && props.sourceVideoUrl && videoElement.value) {
+		videoElement.value.src = props.sourceVideoUrl
+	}
+		await mp.start(props.inputMode)
 
 	tracker.setStep(4)
 

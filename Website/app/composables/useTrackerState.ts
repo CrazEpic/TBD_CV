@@ -1,4 +1,4 @@
-import { ref } from "vue"
+import { computed, ref } from "vue"
 
 export const useTrackerState = () => {
 	const isLoading = ref(true)

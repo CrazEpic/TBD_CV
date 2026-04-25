@@ -1,24 +1,30 @@
 <template>
-	<VRMTracker v-if="selectedCharacter" :model-path="selectedCharacter.model" @quit="returnToLobby" />
+	<VRMTracker
+		v-if="activeModelPath"
+		:input-mode="inputMode"
+		:evaluation-mode="evaluationMode"
+		:model-path="activeModelPath"
+		:source-video-url="activeSourceVideoUrl ?? undefined"
+		@quit="returnToLobby"
+	/>
 </template>
 
 <script setup lang="ts">
-import { useSelectedCharacter } from "~/composables/useSelectedCharacter"
+import { useTrackerSession } from "@/composables/useTrackerSession"
 
 definePageMeta({
 	layout: false,
 })
 
-const { selectedCharacter, clearCharacter } = useSelectedCharacter()
+const { activeModelPath, inputMode, evaluationMode, activeSourceVideoUrl } = useTrackerSession()
 const router = useRouter()
 
 const returnToLobby = () => {
-	clearCharacter()
 	router.push("/")
 }
 
 onMounted(() => {
-	if (!selectedCharacter.value) {
+	if (!activeModelPath.value) {
 		router.push("/")
 	}
 })
