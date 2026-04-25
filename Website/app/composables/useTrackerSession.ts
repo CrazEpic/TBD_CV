@@ -22,8 +22,8 @@ export type TrackerSessionExport = {
 	selectedCharacterId: string | null
 }
 
-let customModelObjectUrl: string | null = null
-let sourceVideoObjectUrl: string | null = null
+const customModelObjectUrl = ref<string | null>(null)
+const sourceVideoObjectUrl = ref<string | null>(null)
 
 const inputMode = ref<InputMode>("webcam")
 const evaluationMode = ref<EvaluationMode>("none")
@@ -31,13 +31,14 @@ const selectedNoteId = ref<string | null>(null)
 const noteRanges = ref<SessionNoteRange[]>([])
 const customModelName = ref<string | null>(null)
 const sourceVideoName = ref<string | null>(null)
+const sourceVideoDurationMs = ref<number | null>(null)
 
 export const useTrackerSession = () => {
 	const { selectedCharacter, setCharacter, clearCharacter } = useSelectedCharacter()
 
-	const activeModelPath = computed(() => customModelObjectUrl ?? selectedCharacter.value?.model ?? null)
+	const activeModelPath = computed(() => customModelObjectUrl.value ?? selectedCharacter.value?.model ?? null)
 	const activeModelLabel = computed(() => customModelName.value ?? selectedCharacter.value?.name ?? null)
-	const activeSourceVideoUrl = computed(() => sourceVideoObjectUrl)
+	const activeSourceVideoUrl = computed(() => sourceVideoObjectUrl.value)
 	const hasModelSelection = computed(() => Boolean(activeModelPath.value))
 	const selectedNote = computed<ViolinNoteOption | null>(() => {
 		return VIOLIN_NOTE_OPTIONS.find((option) => option.id === selectedNoteId.value) ?? null
@@ -55,18 +56,18 @@ export const useTrackerSession = () => {
 	}
 
 	const selectBuiltInCharacter = (character: Character) => {
-		if (customModelObjectUrl) {
-			URL.revokeObjectURL(customModelObjectUrl)
-			customModelObjectUrl = null
+		if (customModelObjectUrl.value) {
+			URL.revokeObjectURL(customModelObjectUrl.value)
+			customModelObjectUrl.value = null
 		}
 		customModelName.value = null
 		setCharacter(character)
 	}
 
 	const setCustomModel = (file: File | null) => {
-		if (customModelObjectUrl) {
-			URL.revokeObjectURL(customModelObjectUrl)
-			customModelObjectUrl = null
+		if (customModelObjectUrl.value) {
+			URL.revokeObjectURL(customModelObjectUrl.value)
+			customModelObjectUrl.value = null
 		}
 
 		if (!file) {
@@ -75,24 +76,49 @@ export const useTrackerSession = () => {
 			return
 		}
 
-		customModelObjectUrl = URL.createObjectURL(file)
+		customModelObjectUrl.value = URL.createObjectURL(file)
 		customModelName.value = file.name
 		clearCharacter()
 	}
 
 	const setSourceVideo = (file: File | null) => {
-		if (sourceVideoObjectUrl) {
-			URL.revokeObjectURL(sourceVideoObjectUrl)
-			sourceVideoObjectUrl = null
+		if (sourceVideoObjectUrl.value) {
+			URL.revokeObjectURL(sourceVideoObjectUrl.value)
+			sourceVideoObjectUrl.value = null
 		}
 
 		if (!file) {
 			sourceVideoName.value = null
+			sourceVideoDurationMs.value = null
 			return
 		}
 
-		sourceVideoObjectUrl = URL.createObjectURL(file)
+		sourceVideoObjectUrl.value = URL.createObjectURL(file)
 		sourceVideoName.value = file.name
+		sourceVideoDurationMs.value = null
+
+		if (import.meta.client) {
+			const probe = document.createElement("video")
+			probe.preload = "metadata"
+			probe.src = sourceVideoObjectUrl.value
+
+			const finalize = () => {
+				probe.removeAttribute("src")
+				probe.load()
+			}
+
+			probe.onloadedmetadata = () => {
+				if (Number.isFinite(probe.duration) && probe.duration > 0) {
+					sourceVideoDurationMs.value = Math.round(probe.duration * 1000)
+				}
+				finalize()
+			}
+
+			probe.onerror = () => {
+				sourceVideoDurationMs.value = null
+				finalize()
+			}
+		}
 	}
 
 	const setSelectedNoteId = (noteId: string | null) => {
@@ -167,6 +193,7 @@ export const useTrackerSession = () => {
 		noteRanges,
 		customModelName,
 		sourceVideoName,
+		sourceVideoDurationMs,
 		selectedCharacter,
 		activeModelPath,
 		activeModelLabel,

@@ -207,8 +207,8 @@
 
 		<!-- CAMERA PREVIEW -->
 		<div class="absolute right-4 bottom-4 w-70 overflow-hidden rounded-lg border border-white/10 bg-black shadow-lg">
-			<video ref="videoElement" :controls="props.inputMode === 'video'" autoplay muted playsinline class="w-full scale-x-[-1]" />
-			<canvas ref="guideCanvas" class="absolute inset-0 w-full scale-x-[-1]" />
+			<video ref="videoElement" :controls="props.inputMode === 'video'" autoplay playsinline class="w-full" />
+			<canvas ref="guideCanvas" class="absolute inset-0 w-full pointer-events-none" />
 			<div v-if="props.inputMode === 'video' && !props.sourceVideoUrl" class="absolute inset-x-0 bottom-0 bg-black/70 p-3 text-xs text-slate-300">
 				Upload a source video to enable frame-by-frame analysis.
 			</div>
@@ -406,7 +406,11 @@ onMounted(async () => {
 
 	// 2. VRM
 	tracker.setStep(1)
-	vrm = await three.loadVRM(`${base}${props.modelPath}`)
+	// Use blob URLs directly, otherwise prepend base for public folder assets
+	const modelUrl = props.modelPath.startsWith("blob:") || props.modelPath.startsWith("http")
+		? props.modelPath
+		: `${base}${props.modelPath}`
+	vrm = await three.loadVRM(modelUrl)
 
 	vrmRig = useVRMRig(vrm, {
 		debugMode: props.debugMode,
@@ -429,9 +433,13 @@ onMounted(async () => {
 	// 4. Camera
 	tracker.setStep(3)
 	if (props.inputMode === "video" && props.sourceVideoUrl && videoElement.value) {
-		videoElement.value.src = props.sourceVideoUrl
+		// Use blob URLs directly, otherwise prepend base for public folder assets
+		const videoUrl = props.sourceVideoUrl.startsWith("blob:") || props.sourceVideoUrl.startsWith("http")
+			? props.sourceVideoUrl
+			: `${base}${props.sourceVideoUrl}`
+		videoElement.value.src = videoUrl
 	}
-		await mp.start(props.inputMode)
+	await mp.start(props.inputMode)
 
 	tracker.setStep(4)
 
