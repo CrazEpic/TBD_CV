@@ -39,13 +39,16 @@
 					<div class="mb-2 font-medium text-white">Position</div>
 					<div v-for="axis in axes" :key="`p-${axis}`" class="mb-2">
 						<div class="mb-1 flex items-center justify-between">
-							<button
+							<UButton
 								type="button"
-								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-cyan-300"
+								variant="ghost"
+								color="neutral"
+								size="xs"
+								class="cursor-ew-resize px-0! py-0! text-[11px] uppercase tracking-[0.18em] text-cyan-300"
 								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'calibration', section: 'position', axis, propId: selectedProp })"
 							>
 								{{ axis.toUpperCase() }} (drag)
-							</button>
+							</UButton>
 							<span class="text-[10px] text-gray-400">{{ getTransformValue('position', axis).toFixed(3) }}</span>
 						</div>
 						<UInputNumber
@@ -61,13 +64,16 @@
 					<div class="mb-2 font-medium text-white">Rotation (deg)</div>
 					<div v-for="axis in axes" :key="`r-${axis}`" class="mb-2">
 						<div class="mb-1 flex items-center justify-between">
-							<button
+							<UButton
 								type="button"
-								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-orange-300"
+								variant="ghost"
+								color="neutral"
+								size="xs"
+								class="cursor-ew-resize px-0! py-0! text-[11px] uppercase tracking-[0.18em] text-orange-300"
 								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'calibration', section: 'rotationDeg', axis, propId: selectedProp })"
 							>
 								{{ axis.toUpperCase() }} (drag)
-							</button>
+							</UButton>
 							<span class="text-[10px] text-gray-400">{{ getTransformValue('rotationDeg', axis).toFixed(1) }}</span>
 						</div>
 						<UInputNumber
@@ -83,13 +89,16 @@
 					<div class="mb-2 font-medium text-white">Scale</div>
 					<div v-for="axis in axes" :key="`s-${axis}`" class="mb-2">
 						<div class="mb-1 flex items-center justify-between">
-							<button
+							<UButton
 								type="button"
-								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-lime-300"
+								variant="ghost"
+								color="neutral"
+								size="xs"
+								class="cursor-ew-resize px-0! py-0! text-[11px] uppercase tracking-[0.18em] text-lime-300"
 								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'calibration', section: 'scale', axis, propId: selectedProp })"
 							>
 								{{ axis.toUpperCase() }} (drag)
-							</button>
+							</UButton>
 							<span class="text-[10px] text-gray-400">{{ getTransformValue('scale', axis).toFixed(3) }}</span>
 						</div>
 						<UInputNumber
@@ -105,13 +114,16 @@
 					<div class="mb-2 font-medium text-white">Parent Defaults (Base Transform)</div>
 					<div v-for="axis in axes" :key="`pp-${axis}`" class="mb-2">
 						<div class="mb-1 flex items-center justify-between">
-							<button
+							<UButton
 								type="button"
-								class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-fuchsia-300"
+								variant="ghost"
+								color="neutral"
+								size="xs"
+								class="cursor-ew-resize px-0! py-0! text-[11px] uppercase tracking-[0.18em] text-fuchsia-300"
 								@pointerdown.prevent="startCalibrationScrub($event, { scope: 'parent', section: 'position', axis, propId: selectedProp })"
 							>
 								Position {{ axis.toUpperCase() }} (drag)
-							</button>
+							</UButton>
 							<span class="text-[10px] text-gray-400">{{ getParentValue('position', axis).toFixed(3) }}</span>
 						</div>
 						<UInputNumber
@@ -173,7 +185,7 @@
 						<UButton size="xs" variant="outline" @click="exportCalibration">Export</UButton>
 						<UButton size="xs" variant="outline" @click="importCalibration">Import</UButton>
 					</div>
-					<textarea v-model="calibrationJson" rows="8" class="w-full rounded border border-white/20 bg-black/40 p-2 text-[11px] text-gray-100" />
+					<UTextarea v-model="calibrationJson" :rows="8" class="w-full text-[11px]" />
 				</div>
 			</div>
 		</div>

@@ -126,9 +126,16 @@
 							</div>
 
 							<div class="space-y-1">
-								<button type="button" class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-slate-400" @pointerdown.prevent="startValueScrub($event, range.id, 'start')">
+								<UButton
+									type="button"
+									variant="ghost"
+									color="neutral"
+									size="xs"
+									class="cursor-ew-resize px-0! py-0! text-[11px] uppercase tracking-[0.18em] text-slate-400"
+									@pointerdown.prevent="startValueScrub($event, range.id, 'start')"
+								>
 									Start (drag)
-								</button>
+								</UButton>
 								<UInputNumber
 									:min="0"
 									:step="10"
@@ -139,9 +146,16 @@
 								/>
 							</div>
 							<div class="space-y-1">
-								<button type="button" class="cursor-ew-resize text-[11px] uppercase tracking-[0.18em] text-slate-400" @pointerdown.prevent="startValueScrub($event, range.id, 'end')">
+								<UButton
+									type="button"
+									variant="ghost"
+									color="neutral"
+									size="xs"
+									class="cursor-ew-resize px-0! py-0! text-[11px] uppercase tracking-[0.18em] text-slate-400"
+									@pointerdown.prevent="startValueScrub($event, range.id, 'end')"
+								>
 									End (drag)
-								</button>
+								</UButton>
 								<UInputNumber
 									:min="0"
 									:step="10"

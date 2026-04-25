@@ -72,11 +72,13 @@
 					<template #model>
 						<div :ref="(el) => setStepContentRef(el, 0)" class="mt-3 space-y-4 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
 							<div class="grid gap-3 sm:grid-cols-3">
-								<button
+								<UButton
 									v-for="character in characters"
 									:key="character.id"
 									type="button"
-									class="group overflow-hidden rounded-2xl border text-left transition"
+									variant="ghost"
+									color="neutral"
+									class="group h-auto w-full flex-col items-stretch gap-0 overflow-hidden rounded-2xl border p-0 text-left transition"
 									:class="
 										activeCharacterId === character.id
 											? 'border-amber-300 bg-amber-300/15 shadow-lg ring-2 shadow-amber-300/10 ring-amber-300/70'
@@ -89,7 +91,7 @@
 									<div class="space-y-1 p-3">
 										<p class="text-sm font-medium text-white">{{ character.name }}</p>
 									</div>
-								</button>
+								</UButton>
 							</div>
 
 							<div class="space-y-2">
@@ -189,18 +191,21 @@ const characters = [
 	{
 		id: "sample-a",
 		name: "Sample A",
+		description: "Default balanced avatar",
 		image: "/Avatar_SampleA.png",
 		model: "/Avatar_SampleA.vrm",
 	},
 	{
 		id: "sample-b",
 		name: "Sample B",
+		description: "Alternative expression preset",
 		image: "/Avatar_SampleB.png",
 		model: "/Avatar_SampleB.vrm",
 	},
 	{
 		id: "sample-c",
 		name: "Sample C",
+		description: "High-contrast stylized avatar",
 		image: "/Avatar_SampleC.png",
 		model: "/Avatar_SampleC.vrm",
 	},
