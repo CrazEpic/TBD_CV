@@ -286,8 +286,56 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		// applyDirection(isLeftAvatarHand ? "LeftLittleDistal" : "RightLittleDistal", fingerAxis, vectorBetween(handLandmarks, HandLandmark.PinkyDIP, HandLandmark.PinkyTIP), lerp)
 	}
 
+	const applyRightHandBowGrip = () => {
+		const setBoneRotation = (boneName: keyof typeof VRMHumanBoneName, x: number, y: number, z: number) => {
+			const bone = getBone(boneName)
+			if (bone) {
+                if (!boneName.includes("RightThumb")) {
+                    z -= 1.5
+                    y -= 0.5
+                } else {
+                    // x -= 1
+                    // y -= 1
+                    // z -= -2
+                }
+				const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z))
+				const lerp = nextLerp()
+				bone.quaternion.slerp(targetQuat, lerp)
+			}
+		}
+
+		// Hard-coded bow grip positions (in radians)
+		// Assuming bending primarily occurs around the Z axis, but this can be tweaked.
+		// Values reflect a classic string bow grip:
+		
+		// Thumb: curved under the stick
+		setBoneRotation("RightThumbMetacarpal", -0.5, 0, 0)
+		setBoneRotation("RightThumbProximal", 0, 0, 0)
+		setBoneRotation("RightThumbDistal", 0, 0, 0)
+
+		// Index: resting on the pad, somewhat curled
+		setBoneRotation("RightIndexProximal", 0, 0, 0.5)
+		setBoneRotation("RightIndexIntermediate", 0, 0, 0.4)
+		setBoneRotation("RightIndexDistal", 0, 0, 0.2)
+
+		// Middle: draped over the frog / stick
+		setBoneRotation("RightMiddleProximal", 0, 0, 0.5)
+		setBoneRotation("RightMiddleIntermediate", 0, 0, 0.4)
+		setBoneRotation("RightMiddleDistal", 0, 0, 0.2)
+
+		// Ring: draped next to middle
+		setBoneRotation("RightRingProximal", 0, 0, 0.5)
+		setBoneRotation("RightRingIntermediate", 0, 0, 0.4)
+		setBoneRotation("RightRingDistal", 0, 0, 0.2)
+
+		// Pinky: curved and resting on top of the stick
+		setBoneRotation("RightLittleProximal", 0, -0.1, 0.5)
+		setBoneRotation("RightLittleIntermediate", 0, 0, 0.4)
+		setBoneRotation("RightLittleDistal", 0, 0, 0.2)
+	}
+
 	const applyHands = (leftHandLandmarks: LandmarkPoint[] | null | undefined, rightHandLandmarks: LandmarkPoint[] | null | undefined) => {
-		applyHandChain(rightHandLandmarks, false)
+		applyRightHandBowGrip()
 		applyHandChain(leftHandLandmarks, true)
 	}
 

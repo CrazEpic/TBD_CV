@@ -98,9 +98,9 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 	}
 
 	const defaultTransformState = (): PropTransformState => ({
-		position: { x: 0, y: 0, z: 0 },
-		rotationDeg: { x: 0, y: 0, z: 0 },
-		scale: { x: 1, y: 1, z: 1 },
+		position: { x: .06, y: -.05, z: 0 },
+        rotationDeg: { x: 0, y: 180, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
 	})
 
 	const defaultPropCalibration = (): PropCalibrationMap => ({
