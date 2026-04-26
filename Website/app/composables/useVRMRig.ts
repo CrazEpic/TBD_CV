@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { VRM, VRMHumanBoneName } from "@pixiv/three-vrm"
 import { type HolisticResults, type LandmarkPoint, HandLandmark, PoseLandmark, getHandLandmark, getPoseLandmark } from "@/utils/landmarks"
 import { normalizeHolisticResults } from "@/utils/landmarkTransforms"
+import { cross } from "three/tsl"
 
 type RigOptions = {
 	smoothFactor?: number
@@ -275,13 +276,13 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 	const applyArms = (poseLandmarks: LandmarkPoint[] | null | undefined) => {
 		const lerp = nextLerp()
 
-		applyDirection("LeftUpperArm", AXIS.xNegative, vectorBetween(poseLandmarks, PoseLandmark.LeftShoulder, PoseLandmark.LeftElbow), lerp)
-		applyDirection("LeftLowerArm", AXIS.xNegative, vectorBetween(poseLandmarks, PoseLandmark.LeftElbow, PoseLandmark.LeftWrist), lerp)
-		applyDirection("LeftHand", AXIS.xNegative, vectorBetween(poseLandmarks, PoseLandmark.LeftWrist, PoseLandmark.LeftIndex), lerp)
+		//applyDirection("LeftUpperArm", AXIS.xNegative, vectorBetween(poseLandmarks, PoseLandmark.LeftShoulder, PoseLandmark.LeftElbow), lerp)
+		//applyDirection("LeftLowerArm", AXIS.xNegative, vectorBetween(poseLandmarks, PoseLandmark.LeftElbow, PoseLandmark.LeftWrist), lerp)
+		//applyDirection("LeftHand", AXIS.xNegative, vectorBetween(poseLandmarks, PoseLandmark.LeftWrist, PoseLandmark.LeftIndex), lerp)
 
 		applyDirection("RightUpperArm", AXIS.xPositive, vectorBetween(poseLandmarks, PoseLandmark.RightShoulder, PoseLandmark.RightElbow), lerp)
 		applyDirection("RightLowerArm", AXIS.xPositive, vectorBetween(poseLandmarks, PoseLandmark.RightElbow, PoseLandmark.RightWrist), lerp)
-		applyDirection("RightHand", AXIS.xPositive, vectorBetween(poseLandmarks, PoseLandmark.RightWrist, PoseLandmark.RightIndex), lerp)
+		//applyDirection("RightHand", AXIS.xPositive, vectorBetween(poseLandmarks, PoseLandmark.RightWrist, PoseLandmark.RightIndex), lerp)
 	}
 
 	const applyLegs = (poseLandmarks: LandmarkPoint[] | null | undefined) => {
@@ -302,37 +303,37 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		const lerp = nextLerp()
 
 		// 1. Orient the Wrist (fixes roll/twist for the entire hand so fingers don't break)
-		const wrist = handLandmarks[HandLandmark.Wrist];
-		const indexMCP = handLandmarks[HandLandmark.IndexFingerMCP];
-		const pinkyMCP = handLandmarks[HandLandmark.PinkyMCP];
-		const middleMCP = handLandmarks[HandLandmark.MiddleFingerMCP];
+		// const wrist = handLandmarks[HandLandmark.Wrist];
+		// const indexMCP = handLandmarks[HandLandmark.IndexFingerMCP];
+		// const pinkyMCP = handLandmarks[HandLandmark.PinkyMCP];
+		// const middleMCP = handLandmarks[HandLandmark.MiddleFingerMCP];
 		
-		if (wrist && indexMCP && pinkyMCP && middleMCP) {
-			const posWrist = new THREE.Vector3(wrist.x, wrist.y, wrist.z ?? 0);
-			const posIndex = new THREE.Vector3(indexMCP.x, indexMCP.y, indexMCP.z ?? 0);
-			const posPinky = new THREE.Vector3(pinkyMCP.x, pinkyMCP.y, pinkyMCP.z ?? 0);
-			const posMiddle = new THREE.Vector3(middleMCP.x, middleMCP.y, middleMCP.z ?? 0);
+		// if (wrist && indexMCP && pinkyMCP && middleMCP) {
+		// 	const posWrist = new THREE.Vector3(wrist.x, wrist.y, wrist.z ?? 0);
+		// 	const posIndex = new THREE.Vector3(indexMCP.x, indexMCP.y, indexMCP.z ?? 0);
+		// 	const posPinky = new THREE.Vector3(pinkyMCP.x, pinkyMCP.y, pinkyMCP.z ?? 0);
+		// 	const posMiddle = new THREE.Vector3(middleMCP.x, middleMCP.y, middleMCP.z ?? 0);
 
-			const targetForward = new THREE.Vector3().subVectors(posMiddle, posWrist).normalize();
+		// 	const targetForward = new THREE.Vector3().subVectors(posMiddle, posWrist).normalize();
 			
-			// Right knuckle cross product calculation
-			const crossKnuckles = isLeftAvatarHand 
-				? new THREE.Vector3().subVectors(posIndex, posPinky).normalize() // Left hand
-				: new THREE.Vector3().subVectors(posPinky, posIndex).normalize(); // Right hand
+		// 	// Right knuckle cross product calculation
+		// 	const crossKnuckles = isLeftAvatarHand 
+		// 		? new THREE.Vector3().subVectors(posIndex, posPinky).normalize() // Left hand
+		// 		: new THREE.Vector3().subVectors(posPinky, posIndex).normalize(); // Right hand
 				
-			const targetUp = new THREE.Vector3().crossVectors(crossKnuckles, targetForward).normalize();
+		// 	const targetUp = new THREE.Vector3().crossVectors(crossKnuckles, targetForward).normalize();
 
-			// Apply baseline pitch offset to neutralize VRM wrist extension
-			const wristPitchOffset = 0.35;
-			targetForward.applyAxisAngle(crossKnuckles, wristPitchOffset);
-			targetUp.applyAxisAngle(crossKnuckles, wristPitchOffset);
+		// 	// Apply baseline pitch offset to neutralize VRM wrist extension
+		// 	const wristPitchOffset = 0.0;
+		// 	targetForward.applyAxisAngle(crossKnuckles, wristPitchOffset);
+		// 	targetUp.applyAxisAngle(crossKnuckles, wristPitchOffset);
 
-			const forwardAxis = isLeftAvatarHand ? AXIS.xNegative : AXIS.xPositive;
-			// Roll axis varies, but Y+ is standard for back-of-hand.
-			const upAxis = AXIS.yPositive; 
+		// 	const forwardAxis = isLeftAvatarHand ? AXIS.xNegative : AXIS.xPositive;
+		// 	// Roll axis varies, but Y+ is standard for back-of-hand.
+		// 	const upAxis = AXIS.yPositive; 
 
-			applyOrientation(isLeftAvatarHand ? "LeftHand" : "RightHand", forwardAxis, upAxis, targetForward, targetUp, lerp);
-		}
+		// 	applyOrientation(isLeftAvatarHand ? "LeftHand" : "RightHand", forwardAxis, upAxis, targetForward, targetUp, lerp);
+		// }
 
 		// 2. Orient the Fingers
 		// If the thumb is backwards, its local Z or Y axis mapping is inverted compared to the fingers.
@@ -384,33 +385,32 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		// Assuming bending primarily occurs around the Z axis, but this can be tweaked.
 		// Values reflect a classic string bow grip:
 		
-		// Thumb: curved under the stick
-		setBoneRotation("RightThumbMetacarpal", -1, 0, 0)
-		setBoneRotation("RightThumbProximal", -1.5, 0, 0)
-		setBoneRotation("RightThumbDistal", -1.5, 0, 0)
+		// // Thumb: curved under the stick
+		// setBoneRotation("RightThumbMetacarpal", -1, 0, 0)
+		// setBoneRotation("RightThumbProximal", -1.5, 0, 0)
+		// setBoneRotation("RightThumbDistal", -1.5, 0, 0)
 
-		//Index: resting on the pad, somewhat curled
-		setBoneRotation("RightIndexProximal", 0, 0, 0.5)
-		setBoneRotation("RightIndexIntermediate", 0, 0, 0.4)
-		setBoneRotation("RightIndexDistal", 0, 0, 0.2)
+		// //Index: resting on the pad, somewhat curled
+		// setBoneRotation("RightIndexProximal", 0, 0, 0.5)
+		// setBoneRotation("RightIndexIntermediate", 0, 0, 0.4)
+		// setBoneRotation("RightIndexDistal", 0, 0, 0.2)
 
-		// Middle: draped over the frog / stick
-		setBoneRotation("RightMiddleProximal", 0, 0, 0.5)
-		setBoneRotation("RightMiddleIntermediate", 0, 0, 0.4)
-		setBoneRotation("RightMiddleDistal", 0, 0, 0.2)
+		// // Middle: draped over the frog / stick
+		// setBoneRotation("RightMiddleProximal", 0, 0, 0.5)
+		// setBoneRotation("RightMiddleIntermediate", 0, 0, 0.4)
+		// setBoneRotation("RightMiddleDistal", 0, 0, 0.2)
 
-		// Ring: draped next to middle
-		setBoneRotation("RightRingProximal", 0, 0, 0.5)
-		setBoneRotation("RightRingIntermediate", 0, 0, 0.4)
-		setBoneRotation("RightRingDistal", 0, 0, 0.2)
+		// // Ring: draped next to middle
+		// setBoneRotation("RightRingProximal", 0, 0, 0.5)
+		// setBoneRotation("RightRingIntermediate", 0, 0, 0.4)
+		// setBoneRotation("RightRingDistal", 0, 0, 0.2)
 
-		// Pinky: curved and resting on top of the stick
-		setBoneRotation("RightLittleProximal", 0, -0.1, 0.5)
-		setBoneRotation("RightLittleIntermediate", 0, 0, 0.4)
-		setBoneRotation("RightLittleDistal", 0, 0, 0.2)
-
+		// // Pinky: curved and resting on top of the stick
+		// setBoneRotation("RightLittleProximal", 0, -0.1, 0.5)
+		// setBoneRotation("RightLittleIntermediate", 0, 0, 0.4)
+		// setBoneRotation("RightLittleDistal", 0, 0, 0.2)
+		
 		if (!handLandmarks) return;
-
 		// Compute forward and up vectors from landmarks for wrist control
 		const wrist = handLandmarks[HandLandmark.Wrist];
 		const indexMCP = handLandmarks[HandLandmark.IndexFingerMCP];
@@ -429,22 +429,23 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		// Knuckles cross: Index to Pinky
 		const crossKnuckles = new THREE.Vector3().subVectors(posPinky, posIndex).normalize();
 		// Up: Back of hand normal
-		const targetUp = new THREE.Vector3().crossVectors(crossKnuckles, targetForward).normalize();
+		const targetUp = new THREE.Vector3().crossVectors(targetForward, crossKnuckles).normalize();
 
 		// The natural wrist-to-MCP vector often appears bent slightly backwards (extended) 
 		// on typical VRM models compared to the visual forearm axis. 
 		// Tweak this pitch offset (in radians) to correct the baseline flexion/extension.
 		// Positive values flex the wrist inward (towards the palm). Negative extends it outward.
-		const wristPitchOffset = 0.75; // roughly 20 degrees
-		targetForward.applyAxisAngle(crossKnuckles, wristPitchOffset);
-		targetUp.applyAxisAngle(crossKnuckles, wristPitchOffset);
+		// const wristPitchOffset = 0.0; // roughly 20 degrees
+		// targetForward.applyAxisAngle(crossKnuckles, wristPitchOffset);
+		// targetUp.applyAxisAngle(crossKnuckles, wristPitchOffset);
+		
 
 		// Right hand VRM typical axes:
 		// Forward points roughly +X (down the arm)
 		// Up (back of hand) points roughly +Y or +Z depending on export. 
 		// We'll assume Y is up and standard X is forward.
 		const lerp = nextLerp();
-		applyOrientation("RightHand", AXIS.xPositive, AXIS.yPositive, targetForward, targetUp, lerp);
+		applyOrientation("RightHand", AXIS.zPositive, AXIS.yPositive, targetForward, targetUp, lerp);
 	}
 
 	const applyHands = (leftHandLandmarks: LandmarkPoint[] | null | undefined, rightHandLandmarks: LandmarkPoint[] | null | undefined) => {
