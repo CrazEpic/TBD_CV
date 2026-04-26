@@ -19,7 +19,7 @@ const AXIS = {
 }
 
 export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
-	const smoothFactor = 100//options.smoothFactor ?? 15
+	const smoothFactor = 100 // options.smoothFactor ?? 15
 	// const debugMode = options.debugMode ?? false
 	const debugMode = true
 	let lastUpdateAt = performance.now()
@@ -142,32 +142,6 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		return Math.min(1, deltaSeconds * smoothFactor)
 	}
 
-	// compute full wrist orientation from hand landmarks
-	const computeWristQuat = (handLandmarks: LandmarkPoint[]): THREE.Quaternion | null => {
-	const wrist = handLandmarks[0];
-	const indexMCP = handLandmarks[5];   // index finger MCP
-	const thumbMCP = handLandmarks[2];   // thumb MCP
-	if (!wrist || !indexMCP || !thumbMCP) return null;
-
-	const posWrist = new THREE.Vector3(wrist.x, wrist.y, wrist.z ?? 0);
-	const posIndex = new THREE.Vector3(indexMCP.x, indexMCP.y, indexMCP.z ?? 0);
-	const posThumb = new THREE.Vector3(thumbMCP.x, thumbMCP.y, thumbMCP.z ?? 0);
-
-	// Forward: wrist → index MCP (flexion/extension)
-	let forward = new THREE.Vector3().subVectors(posIndex, posWrist).normalize();
-	// Right: wrist → thumb MCP (radial/ulnar deviation)
-	let right = new THREE.Vector3().subVectors(posThumb, posWrist).normalize();
-
-	// Orthogonalize: recompute up = cross(right, forward), then right = cross(forward, up)
-	const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-	const finalRight = new THREE.Vector3().crossVectors(forward, up).normalize();
-
-	// Build rotation matrix (X = right, Y = up, Z = forward) – adjust order to match VRM hand
-	const matrix = new THREE.Matrix4();
-	matrix.makeBasis(finalRight, up, forward);
-	return new THREE.Quaternion().setFromRotationMatrix(matrix);
-	};
-
 	const applyWorldRotation = (name: keyof typeof VRMHumanBoneName, targetWorldRotation: THREE.Quaternion, lerp: number) => {
 		const bone = getBone(name)
 		if (!bone) return
@@ -179,6 +153,50 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 
 		const targetLocalRotation = parentInverseWorldRotation.multiply(targetWorldRotation)
 		bone.quaternion.slerp(targetLocalRotation, lerp)
+	}
+
+	const applyOrientation = (
+		name: keyof typeof VRMHumanBoneName,
+		boneAxisForwardLocal: THREE.Vector3,
+		boneAxisUpLocal: THREE.Vector3,
+		targetForwardWorld: THREE.Vector3 | null,
+		targetUpWorld: THREE.Vector3 | null,
+		lerp: number
+	) => {
+		const bone = getBone(name)
+		if (!bone || !targetForwardWorld || !targetUpWorld || targetForwardWorld.lengthSq() < 1e-6 || targetUpWorld.lengthSq() < 1e-6) return
+
+		const fwdTarget = targetForwardWorld.clone().normalize()
+		const upTarget = targetUpWorld.clone().normalize()
+
+		const fwdLocal = resolveCorrectedLocalAxis(name, boneAxisForwardLocal)
+		const upLocal = resolveCorrectedLocalAxis(name, boneAxisUpLocal)
+
+		// 1. Align Forward
+		const currentWorldQuat = new THREE.Quaternion()
+		bone.getWorldQuaternion(currentWorldQuat)
+
+		const fwdWorld = fwdLocal.clone().applyQuaternion(currentWorldQuat).normalize()
+		const alignFwd = new THREE.Quaternion().setFromUnitVectors(fwdWorld, fwdTarget)
+		const firstAlignedQuat = alignFwd.clone().multiply(currentWorldQuat)
+
+		// 2. Align Up (roll around the matched forward axis)
+		const currentUpWorld = upLocal.clone().applyQuaternion(firstAlignedQuat).normalize()
+		// project upTarget onto the plane orthogonal to fwdTarget to isolate the roll
+		const projectedUpTarget = upTarget.clone().projectOnPlane(fwdTarget).normalize()
+		const projectedCurrentUp = currentUpWorld.clone().projectOnPlane(fwdTarget).normalize()
+		
+		const alignUp = new THREE.Quaternion().setFromUnitVectors(projectedCurrentUp, projectedUpTarget)
+		const desiredWorldQuat = alignUp.clone().multiply(firstAlignedQuat)
+
+		// convert to local
+		const parentWorldQuaternion = new THREE.Quaternion()
+		if (bone.parent) {
+			bone.parent.getWorldQuaternion(parentWorldQuaternion)
+		}
+
+		const localTargetRotation = parentWorldQuaternion.clone().invert().multiply(desiredWorldQuat)
+		bone.quaternion.slerp(localTargetRotation, lerp)
 	}
 
 	const applyDirection = (name: keyof typeof VRMHumanBoneName, boneAxisLocalOrient: THREE.Vector3, targetDirectionWorld: THREE.Vector3 | null, lerp: number) => {
@@ -282,9 +300,45 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		if (!handLandmarks) return
 
 		const lerp = nextLerp()
-		const thumbAxis = isLeftAvatarHand ? new THREE.Vector3(-1, 0, 1).normalize() : new THREE.Vector3(1, 0, 1).normalize()
+
+		// 1. Orient the Wrist (fixes roll/twist for the entire hand so fingers don't break)
+		const wrist = handLandmarks[HandLandmark.Wrist];
+		const indexMCP = handLandmarks[HandLandmark.IndexFingerMCP];
+		const pinkyMCP = handLandmarks[HandLandmark.PinkyMCP];
+		const middleMCP = handLandmarks[HandLandmark.MiddleFingerMCP];
+		
+		if (wrist && indexMCP && pinkyMCP && middleMCP) {
+			const posWrist = new THREE.Vector3(wrist.x, wrist.y, wrist.z ?? 0);
+			const posIndex = new THREE.Vector3(indexMCP.x, indexMCP.y, indexMCP.z ?? 0);
+			const posPinky = new THREE.Vector3(pinkyMCP.x, pinkyMCP.y, pinkyMCP.z ?? 0);
+			const posMiddle = new THREE.Vector3(middleMCP.x, middleMCP.y, middleMCP.z ?? 0);
+
+			const targetForward = new THREE.Vector3().subVectors(posMiddle, posWrist).normalize();
+			
+			// Right knuckle cross product calculation
+			const crossKnuckles = isLeftAvatarHand 
+				? new THREE.Vector3().subVectors(posIndex, posPinky).normalize() // Left hand
+				: new THREE.Vector3().subVectors(posPinky, posIndex).normalize(); // Right hand
+				
+			const targetUp = new THREE.Vector3().crossVectors(crossKnuckles, targetForward).normalize();
+
+			// Apply baseline pitch offset to neutralize VRM wrist extension
+			const wristPitchOffset = 0.35;
+			targetForward.applyAxisAngle(crossKnuckles, wristPitchOffset);
+			targetUp.applyAxisAngle(crossKnuckles, wristPitchOffset);
+
+			const forwardAxis = isLeftAvatarHand ? AXIS.xNegative : AXIS.xPositive;
+			// Roll axis varies, but Y+ is standard for back-of-hand.
+			const upAxis = AXIS.yPositive; 
+
+			applyOrientation(isLeftAvatarHand ? "LeftHand" : "RightHand", forwardAxis, upAxis, targetForward, targetUp, lerp);
+		}
+
+		// 2. Orient the Fingers
+		// If the thumb is backwards, its local Z or Y axis mapping is inverted compared to the fingers.
+		// Changing the left thumb axis Z from 1 to -1 flattens/fixes the backward bending loop. (Tune this if it bends too far down!)
+		const thumbAxis = isLeftAvatarHand ? new THREE.Vector3(-1, 0, -1).normalize() : new THREE.Vector3(1, 0, 1).normalize()
 		const fingerAxis = isLeftAvatarHand ? AXIS.xNegative : AXIS.xPositive
-		//const fingerAxis = isLeftAvatarHand ? AXIS.xPositive : AXIS.xNegative
 
 		// Thumb
 		applyDirection(isLeftAvatarHand ? "LeftThumbMetacarpal" : "RightThumbMetacarpal", thumbAxis, vectorBetween(handLandmarks, HandLandmark.ThumbCMC, HandLandmark.ThumbMCP), lerp)
@@ -357,15 +411,40 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 
 		if (!handLandmarks) return;
 
-		// Compute full wrist orientation from landmarks
-		const wristQuat = computeWristQuat(handLandmarks);
-		if (wristQuat) {
-		const handBone = getBone("RightHand");
-		if (handBone) {
-			const lerp = nextLerp();
-			handBone.quaternion.slerp(wristQuat, lerp);
-		}
-		}
+		// Compute forward and up vectors from landmarks for wrist control
+		const wrist = handLandmarks[HandLandmark.Wrist];
+		const indexMCP = handLandmarks[HandLandmark.IndexFingerMCP];
+		const pinkyMCP = handLandmarks[HandLandmark.PinkyMCP];
+		const middleMCP = handLandmarks[HandLandmark.MiddleFingerMCP];
+		
+		if (!wrist || !indexMCP || !pinkyMCP || !middleMCP) return;
+
+		const posWrist = new THREE.Vector3(wrist.x, wrist.y, wrist.z ?? 0);
+		const posIndex = new THREE.Vector3(indexMCP.x, indexMCP.y, indexMCP.z ?? 0);
+		const posPinky = new THREE.Vector3(pinkyMCP.x, pinkyMCP.y, pinkyMCP.z ?? 0);
+		const posMiddle = new THREE.Vector3(middleMCP.x, middleMCP.y, middleMCP.z ?? 0);
+
+		// Forward: Wrist to Middle Finger
+		const targetForward = new THREE.Vector3().subVectors(posMiddle, posWrist).normalize();
+		// Knuckles cross: Index to Pinky
+		const crossKnuckles = new THREE.Vector3().subVectors(posPinky, posIndex).normalize();
+		// Up: Back of hand normal
+		const targetUp = new THREE.Vector3().crossVectors(crossKnuckles, targetForward).normalize();
+
+		// The natural wrist-to-MCP vector often appears bent slightly backwards (extended) 
+		// on typical VRM models compared to the visual forearm axis. 
+		// Tweak this pitch offset (in radians) to correct the baseline flexion/extension.
+		// Positive values flex the wrist inward (towards the palm). Negative extends it outward.
+		const wristPitchOffset = 0.75; // roughly 20 degrees
+		targetForward.applyAxisAngle(crossKnuckles, wristPitchOffset);
+		targetUp.applyAxisAngle(crossKnuckles, wristPitchOffset);
+
+		// Right hand VRM typical axes:
+		// Forward points roughly +X (down the arm)
+		// Up (back of hand) points roughly +Y or +Z depending on export. 
+		// We'll assume Y is up and standard X is forward.
+		const lerp = nextLerp();
+		applyOrientation("RightHand", AXIS.xPositive, AXIS.yPositive, targetForward, targetUp, lerp);
 	}
 
 	const applyHands = (leftHandLandmarks: LandmarkPoint[] | null | undefined, rightHandLandmarks: LandmarkPoint[] | null | undefined) => {
