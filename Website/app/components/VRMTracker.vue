@@ -251,6 +251,7 @@ import { useVRMRig } from "@/composables/useVRMRig"
 import { useTrackerPipeline } from "@/composables/useTrackerPipeline"
 import { useViolinPose } from "@/composables/useViolinPose"
 import { useRuntimeConfig } from "#app"
+import { PoseLandmark, HandLandmark, getPoseLandmark } from "@/utils/landmarks"
 import NoteTargetEditor from "@/components/NoteTargetEditor.vue"
 
 const props = withDefaults(
@@ -332,6 +333,41 @@ let vrm: any = null
 pipeline.registerStage("pose-state", (frame) => {
 	pose.update(frame.results)
 	return frame
+})
+
+// zero hand wrists to pose wrists
+pipeline.registerStage("zero-hand-wrists", (frame) => {
+  const { results } = frame
+  if (results.poseLandmarks && results.leftHandLandmarks) {
+    const leftPoseWrist = getPoseLandmark(results.poseLandmarks, PoseLandmark.LeftWrist)
+    const leftHandWrist = results.leftHandLandmarks[HandLandmark.Wrist]
+    if (leftPoseWrist && leftHandWrist) {
+      const offsetX = leftPoseWrist.x - leftHandWrist.x
+      const offsetY = leftPoseWrist.y - leftHandWrist.y
+      const offsetZ = (leftPoseWrist.z ?? 0) - (leftHandWrist.z ?? 0)
+      for (const lm of results.leftHandLandmarks) {
+        lm.x += offsetX
+        lm.y += offsetY
+        if (lm.z !== undefined) lm.z += offsetZ
+      }
+    }
+  }
+
+  if (results.poseLandmarks && results.rightHandLandmarks) {
+    const rightPoseWrist = getPoseLandmark(results.poseLandmarks, PoseLandmark.RightWrist)
+    const rightHandWrist = results.rightHandLandmarks[HandLandmark.Wrist]
+    if (rightPoseWrist && rightHandWrist) {
+      const offsetX = rightPoseWrist.x - rightHandWrist.x
+      const offsetY = rightPoseWrist.y - rightHandWrist.y
+      const offsetZ = (rightPoseWrist.z ?? 0) - (rightHandWrist.z ?? 0)
+      for (const lm of results.rightHandLandmarks) {
+        lm.x += offsetX
+        lm.y += offsetY
+        if (lm.z !== undefined) lm.z += offsetZ
+      }
+    }
+  }
+  return frame
 })
 
 pipeline.registerStage("vrm-rig", (frame) => {
