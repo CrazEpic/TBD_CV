@@ -293,10 +293,6 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
                 if (!boneName.includes("RightThumb")) {
                     z -= 1.5
                     y -= 0.5
-                } else {
-                    // x -= 1
-                    // y -= 1
-                    // z -= -2
                 }
 				const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z))
 				const lerp = nextLerp()
@@ -309,11 +305,11 @@ export const useVRMRig = (vrm: VRM | null, options: RigOptions = {}) => {
 		// Values reflect a classic string bow grip:
 		
 		// Thumb: curved under the stick
-		setBoneRotation("RightThumbMetacarpal", -0.5, 0, 0)
-		setBoneRotation("RightThumbProximal", 0, 0, 0)
-		setBoneRotation("RightThumbDistal", 0, 0, 0)
+		setBoneRotation("RightThumbMetacarpal", -1, 0, 0)
+		setBoneRotation("RightThumbProximal", -1.5, 0, 0)
+		setBoneRotation("RightThumbDistal", -1.5, 0, 0)
 
-		// Index: resting on the pad, somewhat curled
+		//Index: resting on the pad, somewhat curled
 		setBoneRotation("RightIndexProximal", 0, 0, 0.5)
 		setBoneRotation("RightIndexIntermediate", 0, 0, 0.4)
 		setBoneRotation("RightIndexDistal", 0, 0, 0.2)
