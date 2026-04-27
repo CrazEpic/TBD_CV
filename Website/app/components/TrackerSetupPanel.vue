@@ -186,28 +186,31 @@ const sourceVideoUpload = ref<File | null>(null)
 const inputModeSelection = ref<"webcam" | "video" | undefined>(undefined)
 const evaluationModeSelection = ref<"none" | "evaluation" | undefined>(undefined)
 const stepContentRefs = new Map<number, HTMLElement>()
+const runtimeConfig = useRuntimeConfig()
+const appBaseUrl = (runtimeConfig.app.baseURL || "/").replace(/\/?$/, "/")
+const withBase = (path: string) => `${appBaseUrl}${path.replace(/^\/+/, "")}`
 
 const characters = [
 	{
 		id: "sample-a",
 		name: "Sample A",
 		description: "Default balanced avatar",
-		image: "/Avatar_SampleA.png",
-		model: "/Avatar_SampleA.vrm",
+		image: withBase("Avatar_SampleA.png"),
+		model: withBase("Avatar_SampleA.vrm"),
 	},
 	{
 		id: "sample-b",
 		name: "Sample B",
 		description: "Alternative expression preset",
-		image: "/Avatar_SampleB.png",
-		model: "/Avatar_SampleB.vrm",
+		image: withBase("Avatar_SampleB.png"),
+		model: withBase("Avatar_SampleB.vrm"),
 	},
 	{
 		id: "sample-c",
 		name: "Sample C",
 		description: "High-contrast stylized avatar",
-		image: "/Avatar_SampleC.png",
-		model: "/Avatar_SampleC.vrm",
+		image: withBase("Avatar_SampleC.png"),
+		model: withBase("Avatar_SampleC.vrm"),
 	},
 ]
 

@@ -7,7 +7,7 @@ export default defineNuxtConfig({
 		transpile: ["@mediapipe/camera_utils", "@mediapipe/drawing_utils", "@mediapipe/holistic"],
 	},
 	app: {
-		baseURL: "/Violins-and-VTubers/Website",
+		baseURL: "/Violins-and-VTubers/",
 	},
 	vite: {
 		optimizeDeps: {
