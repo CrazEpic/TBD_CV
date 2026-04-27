@@ -4,7 +4,7 @@ export default defineNuxtConfig({
 	devtools: { enabled: true },
 	css: ["~/assets/css/main.css"],
 	app: {
-		baseURL: "/TBD-CV",
+		baseURL: "/Violins-and-VTubers",
 	},
 	vite: {
 		optimizeDeps: {
