@@ -104,7 +104,7 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 		})
 
 		holistic.value.setOptions({
-			modelComplexity: 0,
+			modelComplexity: 2,
 			smoothLandmarks: true,
 			refineFaceLandmarks: true,
 			minDetectionConfidence: 0.7,

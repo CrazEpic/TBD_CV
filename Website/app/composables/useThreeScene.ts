@@ -23,7 +23,7 @@ export const useThreeScene = (hostRef: any) => {
 
 	const init = async () => {
 		scene.value = new THREE.Scene()
-		scene.value.background = new THREE.Color(0xAAAAAA)
+		scene.value.background = new THREE.Color(0x9ed7b6)
 
 		renderer.value = new THREE.WebGLRenderer({ alpha: true, antialias: true })
 
