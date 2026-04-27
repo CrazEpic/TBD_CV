@@ -38,7 +38,10 @@ export const useViolinPose = () => {
 
 		const leftShoulder = getWorldPoint(rig.getBone("LeftShoulder"))
 		const rightShoulder = getWorldPoint(rig.getBone("RightShoulder"))
+		const leftLowerArm = getWorldPoint(rig.getBone("LeftLowerArm"))
 		const leftHand = getWorldPoint(rig.getBone("LeftHand"))
+		const leftIndex = getWorldPoint(rig.getBone("LeftIndexProximal"))
+		const leftPinky = getWorldPoint(rig.getBone("LeftLittleProximal"))
 		const hips = getWorldPoint(rig.getBone("Hips"))
 		const chest = getWorldPoint(rig.getBone("Chest") ?? rig.getBone("UpperChest") ?? rig.getBone("Spine"))
 
@@ -51,13 +54,34 @@ export const useViolinPose = () => {
 		}
 		previousAnchor = anchor.clone()
 
-		const forward = subtract(leftHand, leftShoulder)
-		if (forward.lengthSq() < 1e-8) return null
-		forward.normalize()
-
 		const torsoUp = subtract(chest, hips)
 		if (torsoUp.lengthSq() < 1e-8) return null
 		torsoUp.normalize()
+
+		const palmTarget = new THREE.Vector3(leftHand.x, leftHand.y, leftHand.z)
+		if (leftLowerArm && leftIndex && leftPinky) {
+			const wrist = new THREE.Vector3(leftHand.x, leftHand.y, leftHand.z)
+			const index = new THREE.Vector3(leftIndex.x, leftIndex.y, leftIndex.z)
+			const pinky = new THREE.Vector3(leftPinky.x, leftPinky.y, leftPinky.z)
+			const across = pinky.clone().sub(index)
+			const palmForward = index.clone().add(pinky).multiplyScalar(0.5).sub(wrist)
+			if (across.lengthSq() >= 1e-8 && palmForward.lengthSq() >= 1e-8) {
+				across.normalize()
+				palmForward.normalize()
+				const palmNormal = new THREE.Vector3().crossVectors(across, palmForward)
+				if (palmNormal.lengthSq() >= 1e-8) {
+					palmNormal.normalize()
+					if (palmNormal.dot(torsoUp) < 0) palmNormal.multiplyScalar(-1)
+					palmTarget.addScaledVector(palmNormal, 0.06)
+				}
+			}
+		} else {
+			palmTarget.addScaledVector(torsoUp, 0.04)
+		}
+
+		const forward = palmTarget.sub(anchor)
+		if (forward.lengthSq() < 1e-8) return null
+		forward.normalize()
 
 		const right = new THREE.Vector3().crossVectors(forward, torsoUp)
 		if (right.lengthSq() < 1e-8) return null
