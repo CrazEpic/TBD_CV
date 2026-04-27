@@ -1,5 +1,5 @@
-import * as THREE from "three/webgpu"
-import { ref, type Ref } from "vue"
+import * as THREE from "three"
+import { ref, shallowRef, type Ref } from "vue"
 
 type PropId = "violin" | "bow"
 type Axis = "x" | "y" | "z"
@@ -54,20 +54,20 @@ export type ViolinFingeringWorldPoint = {
 export const usePropCalibration = (sceneRef: Ref<any>) => {
 	const violinDebugFingeringsGroupRef = shallowRef<THREE.Group | null>(null)
 	const propParents = {
-		violin: ref<THREE.Group | null>(null),
-		bow: ref<THREE.Group | null>(null),
+		violin: shallowRef<THREE.Group | null>(null),
+		bow: shallowRef<THREE.Group | null>(null),
 	}
 	const propPoseParents = {
-		violin: ref<THREE.Group | null>(null),
-		bow: ref<THREE.Group | null>(null),
+		violin: shallowRef<THREE.Group | null>(null),
+		bow: shallowRef<THREE.Group | null>(null),
 	}
 	const propModelRoots = {
-		violin: ref<THREE.Group | null>(null),
-		bow: ref<THREE.Group | null>(null),
+		violin: shallowRef<THREE.Group | null>(null),
+		bow: shallowRef<THREE.Group | null>(null),
 	}
 	const propDebugRoots = {
-		violin: ref<THREE.Group | null>(null),
-		bow: ref<THREE.Group | null>(null),
+		violin: shallowRef<THREE.Group | null>(null),
+		bow: shallowRef<THREE.Group | null>(null),
 	}
 	const propDiagnostics = ref<Record<PropId, { branchName: string; meshCount: number }>>({
 		violin: { branchName: "", meshCount: 0 },

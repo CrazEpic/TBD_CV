@@ -1,17 +1,17 @@
-import * as THREE from "three/webgpu"
+import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm"
-import { ref } from "vue"
+import { shallowRef } from "vue"
 import { usePropCalibration } from "@/composables/usePropCalibration"
 import { useViolinKeypoints } from "@/composables/useViolinKeypoints"
 
 export const useThreeScene = (hostRef: any) => {
-	const scene = ref<THREE.Scene | null>(null)
-	const camera = ref<THREE.PerspectiveCamera | null>(null)
-	const renderer = ref<any>(null)
-	const controls = ref<OrbitControls | null>(null)
-	const currentVrm = ref<VRM | null>(null)
+	const scene = shallowRef<THREE.Scene | null>(null)
+	const camera = shallowRef<THREE.PerspectiveCamera | null>(null)
+	const renderer = shallowRef<any>(null)
+	const controls = shallowRef<OrbitControls | null>(null)
+	const currentVrm = shallowRef<VRM | null>(null)
 	const propTools = usePropCalibration(scene)
 	const { getDebugPoints, getFingeringPoints } = useViolinKeypoints()
 
@@ -23,10 +23,9 @@ export const useThreeScene = (hostRef: any) => {
 
 	const init = async () => {
 		scene.value = new THREE.Scene()
-		scene.value.background = new THREE.Color(0x555555)
+		scene.value.background = new THREE.Color(0xAAAAAA)
 
-		renderer.value = new THREE.WebGPURenderer({ alpha: true, antialias: true })
-		await renderer.value.init()
+		renderer.value = new THREE.WebGLRenderer({ alpha: true, antialias: true })
 
 		hostRef.value.appendChild(renderer.value.domElement)
 
@@ -67,7 +66,7 @@ export const useThreeScene = (hostRef: any) => {
 		camera.value.updateProjectionMatrix()
 
 		renderer.value.setSize(w, h)
-		renderer.value.setPixelRatio(window.devicePixelRatio)
+		renderer.value.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
 	}
 
 	const startLoop = () => {

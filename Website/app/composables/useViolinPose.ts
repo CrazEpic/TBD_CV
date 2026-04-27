@@ -1,4 +1,4 @@
-import * as THREE from "three/webgpu"
+import * as THREE from "three"
 import { VRMHumanBoneName } from "@pixiv/three-vrm"
 
 type Vec3 = { x: number; y: number; z: number }

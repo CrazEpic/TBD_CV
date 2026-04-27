@@ -6,6 +6,9 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 	const holistic = shallowRef<Holistic | null>(null)
 	let camera: Camera | null = null
 	let videoLoopId = 0
+	let guideCanvasWidth = 0
+	let guideCanvasHeight = 0
+	let guideCanvasCtx: CanvasRenderingContext2D | null = null
 
 	let onResultsCallback: ((results: Results) => void) | null = null
 
@@ -18,27 +21,39 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 			return
 		}
 
-		guideCanvasRef.value.width = videoRef.value.videoWidth
-		guideCanvasRef.value.height = videoRef.value.videoHeight
-
-		const canvasCtx = guideCanvasRef.value.getContext("2d")
-		if (!canvasCtx) {
+		const nextWidth = videoRef.value.videoWidth || guideCanvasRef.value.width
+		const nextHeight = videoRef.value.videoHeight || guideCanvasRef.value.height
+		if (!nextWidth || !nextHeight) {
 			return
 		}
 
-		canvasCtx.save()
-		canvasCtx.clearRect(0, 0, guideCanvasRef.value.width, guideCanvasRef.value.height)
+		if (guideCanvasRef.value.width !== nextWidth) {
+			guideCanvasRef.value.width = nextWidth
+		}
+		if (guideCanvasRef.value.height !== nextHeight) {
+			guideCanvasRef.value.height = nextHeight
+		}
 
-		drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {
+		guideCanvasWidth = nextWidth
+		guideCanvasHeight = nextHeight
+		guideCanvasCtx = guideCanvasCtx ?? guideCanvasRef.value.getContext("2d")
+		if (!guideCanvasCtx) {
+			return
+		}
+
+		guideCanvasCtx.save()
+		guideCanvasCtx.clearRect(0, 0, guideCanvasWidth, guideCanvasHeight)
+
+		drawConnectors(guideCanvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {
 			color: "#00cff7",
 			lineWidth: 4,
 		})
-		drawLandmarks(canvasCtx, results.poseLandmarks, {
+		drawLandmarks(guideCanvasCtx, results.poseLandmarks, {
 			color: "#ff0364",
 			lineWidth: 2,
 		})
 
-		drawConnectors(canvasCtx, results.faceLandmarks, FACEMESH_TESSELATION, {
+		drawConnectors(guideCanvasCtx, results.faceLandmarks, FACEMESH_TESSELATION, {
 			color: "#C0C0C070",
 			lineWidth: 1,
 		})
@@ -47,32 +62,32 @@ export const useMediaPipeHolistic = (videoRef: any, guideCanvasRef?: any) => {
 			const leftIris = results.faceLandmarks[468]
 			const rightIris = results.faceLandmarks[473]
 			if (leftIris && rightIris) {
-				drawLandmarks(canvasCtx, [leftIris, rightIris], {
+				drawLandmarks(guideCanvasCtx, [leftIris, rightIris], {
 					color: "#ffe603",
 					lineWidth: 2,
 				})
 			}
 		}
 
-		drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS, {
+		drawConnectors(guideCanvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS, {
 			color: "#eb1064",
 			lineWidth: 5,
 		})
-		drawLandmarks(canvasCtx, results.leftHandLandmarks, {
+		drawLandmarks(guideCanvasCtx, results.leftHandLandmarks, {
 			color: "#00cff7",
 			lineWidth: 2,
 		})
 
-		drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS, {
+		drawConnectors(guideCanvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS, {
 			color: "#22c3e3",
 			lineWidth: 5,
 		})
-		drawLandmarks(canvasCtx, results.rightHandLandmarks, {
+		drawLandmarks(guideCanvasCtx, results.rightHandLandmarks, {
 			color: "#ff0364",
 			lineWidth: 2,
 		})
 
-		canvasCtx.restore()
+		guideCanvasCtx.restore()
 	}
 
 	const sendFrame = async (image: CanvasImageSource) => {

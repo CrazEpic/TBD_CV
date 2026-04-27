@@ -1,11 +1,12 @@
-import * as THREE from "three/webgpu"
+import * as THREE from "three"
 import type { Ref } from "vue"
 import type { FingerAccuracyReading } from "@/composables/useViolinFingerAccuracy"
 
 export const useAccuracyDebugLine = (sceneRef: Ref<THREE.Scene | null>) => {
 	const positions = new Float32Array(6)
 	const geometry = new THREE.BufferGeometry()
-	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+	const positionAttribute = new THREE.BufferAttribute(positions, 3)
+	geometry.setAttribute("position", positionAttribute)
 
 	const material = new THREE.LineBasicMaterial({
 		color: 0xa855f7,
@@ -42,9 +43,7 @@ export const useAccuracyDebugLine = (sceneRef: Ref<THREE.Scene | null>) => {
 		positions[3] = reading.fingerWorld.x
 		positions[4] = reading.fingerWorld.y
 		positions[5] = reading.fingerWorld.z
-		const positionAttribute = geometry.getAttribute("position") as THREE.BufferAttribute
 		positionAttribute.needsUpdate = true
-		geometry.computeBoundingSphere()
 		line.visible = true
 	}
 
