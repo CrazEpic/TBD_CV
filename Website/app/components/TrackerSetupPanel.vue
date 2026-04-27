@@ -164,8 +164,18 @@
 				</UStepper>
 
 				<div class="mt-4 flex items-center justify-between gap-3">
-					<UButton variant="outline" color="neutral" size="sm" leading-icon="i-lucide-arrow-left" :disabled="!hasPrevStep" @click="goToPrevStep"> Back </UButton>
-					<UButton variant="outline" color="neutral" size="sm" trailing-icon="i-lucide-arrow-right" :disabled="!hasNextStep" @click="goToNextStep"> Next </UButton>
+					<UButton variant="outline" color="neutral" size="sm" :disabled="!hasPrevStep" @click="goToPrevStep">
+						<template #leading>
+							<UIcon name="i-lucide-arrow-left" class="h-4 w-4" />
+						</template>
+						Back
+					</UButton>
+					<UButton variant="outline" color="neutral" size="sm" :disabled="!hasNextStep" @click="goToNextStep">
+						Next
+						<template #trailing>
+							<UIcon name="i-lucide-arrow-right" class="h-4 w-4" />
+						</template>
+					</UButton>
 				</div>
 			</div>
 		</section>

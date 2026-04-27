@@ -39,9 +39,19 @@
 		<!-- DEBUG CONTROLS -->
 		<div class="absolute top-4 right-4 z-50 flex gap-2">
 			<!-- <UButton :icon="showBoneAxes ? 'i-lucide-check' : 'i-lucide-plus'" :color="showBoneAxes ? 'success' : 'neutral'" variant="outline" @click="toggleBoneAxes"> Axes </UButton> -->
-			<UButton :icon="showWireframe ? 'i-lucide-check' : 'i-lucide-plus'" :color="showWireframe ? 'success' : 'neutral'" @click="toggleWireframe"> Wireframe </UButton>
+			<UButton :color="showWireframe ? 'success' : 'neutral'" @click="toggleWireframe">
+				<template #leading>
+					<UIcon :name="showWireframe ? 'i-lucide-check' : 'i-lucide-plus'" class="h-4 w-4" />
+				</template>
+				Wireframe
+			</UButton>
 			<!-- <UButton :icon="showCalibration ? 'i-lucide-sliders-horizontal' : 'i-lucide-sliders'" variant="outline" @click="toggleCalibration"> Calibration </UButton> -->
-			<UButton icon="i-lucide-log-out" color="error" @click="$emit('quit')"> Quit </UButton>
+			<UButton color="error" @click="$emit('quit')">
+				<template #leading>
+					<UIcon name="i-lucide-log-out" class="h-4 w-4" />
+				</template>
+				Quit
+			</UButton>
 		</div>
 
 		<div v-if="showCalibration" class="absolute top-16 right-4 z-50 max-h-[70vh] w-96 overflow-auto rounded-lg border border-white/10 bg-black/75 p-4 shadow-lg backdrop-blur">
