@@ -46,7 +46,13 @@ type DebugPoint = {
 	group?: string
 }
 
+export type ViolinFingeringWorldPoint = {
+	name: string
+	world: THREE.Vector3
+}
+
 export const usePropCalibration = (sceneRef: Ref<any>) => {
+	const violinDebugFingeringsGroupRef = shallowRef<THREE.Group | null>(null)
 	const propParents = {
 		violin: ref<THREE.Group | null>(null),
 		bow: ref<THREE.Group | null>(null),
@@ -98,9 +104,9 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 	}
 
 	const defaultTransformState = (): PropTransformState => ({
-		position: { x: .08, y: -.04, z: 0.03 },
-        rotationDeg: { x: 0, y: 180, z: -60 },
-        scale: { x: 1, y: 1, z: 1 },
+		position: { x: 0.08, y: -0.04, z: 0.03 },
+		rotationDeg: { x: 0, y: 180, z: -60 },
+		scale: { x: 1, y: 1, z: 1 },
 	})
 
 	const defaultPropCalibration = (): PropCalibrationMap => ({
@@ -147,11 +153,7 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 
 	const applyTransformState = (target: THREE.Object3D, state: PropTransformState) => {
 		target.position.set(state.position.x, state.position.y, state.position.z)
-		target.rotation.set(
-			THREE.MathUtils.degToRad(state.rotationDeg.x),
-			THREE.MathUtils.degToRad(state.rotationDeg.y),
-			THREE.MathUtils.degToRad(state.rotationDeg.z),
-		)
+		target.rotation.set(THREE.MathUtils.degToRad(state.rotationDeg.x), THREE.MathUtils.degToRad(state.rotationDeg.y), THREE.MathUtils.degToRad(state.rotationDeg.z))
 		target.scale.set(state.scale.x, state.scale.y, state.scale.z)
 	}
 
@@ -218,9 +220,7 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		const branches = getBranchCandidates(rootNode)
 		if (!branches.length) return
 
-		const sorted = [...branches]
-			.map((node) => ({ node, meshCount: countMeshes(node) }))
-			.sort((a, b) => b.meshCount - a.meshCount)
+		const sorted = [...branches].map((node) => ({ node, meshCount: countMeshes(node) })).sort((a, b) => b.meshCount - a.meshCount)
 
 		const violinBranch = sorted[0]?.node ?? null
 		const bowBranch = sorted[1]?.node ?? null
@@ -331,6 +331,37 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		clearDebugGroup(violinDebugFingeringsGroup)
 		violinDebugFingeringsGroup = buildMarkerGroup("ViolinDebugFingerings", points, 0xef4444, 0.003)
 		violinDebugRoot.add(violinDebugFingeringsGroup)
+		violinDebugFingeringsGroupRef.value = violinDebugFingeringsGroup
+	}
+
+	const getViolinFingeringWorldPointByName = (name: string): THREE.Vector3 | null => {
+		const group = violinDebugFingeringsGroupRef.value
+		if (!group) return null
+
+		const debugFingerings = getViolinDebugFingerings.value ?? []
+		const match = debugFingerings.find((entry) => entry.name === name)
+		if (!match) return null
+
+		group.updateWorldMatrix(true, false)
+		return match.position.clone().applyMatrix4(group.matrixWorld)
+	}
+
+	const getViolinFingeringWorldPoint = (stringName: "G" | "D" | "A" | "E", positionOnString: number): THREE.Vector3 | null => {
+		if (!Number.isFinite(positionOnString) || positionOnString < 0) return null
+		const pointName = `fingering_${stringName}_${Math.floor(positionOnString)}`
+		return getViolinFingeringWorldPointByName(pointName)
+	}
+
+	const getViolinFingeringWorldPoints = (): ViolinFingeringWorldPoint[] => {
+		const group = violinDebugFingeringsGroupRef.value
+		if (!group) return []
+
+		group.updateWorldMatrix(true, false)
+		const debugFingerings = getViolinDebugFingerings.value ?? []
+		return debugFingerings.map((entry) => ({
+			name: entry.name,
+			world: entry.position.clone().applyMatrix4(group.matrixWorld),
+		}))
 	}
 
 	const drawViolinReferenceMarkers = (zValues: number[] = [0.575, 0.64]) => {
@@ -460,7 +491,7 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		const measurement = getPropMeasurement(propId)
 		if (!measurement || measurement.zMeters <= 1e-6) return
 
-		const factor = (targetCm / 100) / measurement.zMeters
+		const factor = targetCm / 100 / measurement.zMeters
 		const current = propCalibration.value[propId]
 		setPropCalibration(propId, {
 			scale: {
@@ -478,7 +509,7 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 				parentDefaults: propParentDefaults.value,
 			},
 			null,
-			2,
+			2
 		)
 
 	const importPropCalibration = (rawJson: string) => {
@@ -518,7 +549,17 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		propDebugRoots.bow.value = null
 	}
 
+	const getViolinDebugFingerings = computed(() => {
+		return violinDebugFingeringsGroupRef.value?.children.map((child) => {
+			return {
+				name: child.name,
+				position: child.position.clone(),
+			}
+		})
+	})
+
 	return {
+		getViolinDebugFingerings,
 		splitViolinAndBow,
 		setPropCalibration,
 		setPropPoseParent,
@@ -537,6 +578,9 @@ export const usePropCalibration = (sceneRef: Ref<any>) => {
 		drawViolinKeypoints,
 		drawViolinFingerings,
 		drawViolinReferenceMarkers,
+		getViolinFingeringWorldPointByName,
+		getViolinFingeringWorldPoint,
+		getViolinFingeringWorldPoints,
 		getPropTransformOffset,
 		dispose,
 	}

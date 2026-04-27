@@ -101,9 +101,12 @@ export const useViolinKeypoints = () => {
 
 			return Array.from({ length: locationsPerString }, (_, halfStep) => {
 				const distance = distanceFromFingerboardEnd(halfStep, targetLength)
+				const position = addScaledVec3(fingerboardEnd, direction, distance)
+				// flip X because unity model is left-handed but three.js is right-handed
+				const flippedPosition: Vec3Tuple = [-position[0], position[1], position[2]]
 				return {
 					name: `fingering_${stringName}_${halfStep}`,
-					position: addScaledVec3(fingerboardEnd, direction, distance),
+					position: flippedPosition,
 					group: "fingering" as const,
 				}
 			})

@@ -186,6 +186,9 @@ export const useThreeScene = (hostRef: any) => {
 		getPropDiagnostics: propTools.getPropDiagnostics,
 		getPropTransformOffset: propTools.getPropTransformOffset,
 		drawViolinReferenceMarkers: propTools.drawViolinReferenceMarkers,
+		getViolinFingeringWorldPoint: propTools.getViolinFingeringWorldPoint,
+		getViolinFingeringWorldPointByName: propTools.getViolinFingeringWorldPointByName,
+		getViolinFingeringWorldPoints: propTools.getViolinFingeringWorldPoints,
 		dispose,
 	}
 }

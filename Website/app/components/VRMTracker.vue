@@ -9,6 +9,27 @@
 			<span class="rounded-full bg-white/10 px-2 py-1 tracking-[0.25em] uppercase">{{ props.modelPath.split("/").pop() }}</span>
 		</div>
 
+		<div class="absolute top-16 left-4 z-50 w-72 rounded-lg border border-white/10 bg-black/65 p-3 text-xs text-slate-200 backdrop-blur">
+			<div class="mb-2 flex items-center justify-between">
+				<p class="uppercase tracking-[0.2em] text-slate-400">Finger Accuracy</p>
+				<span class="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase">{{ accuracyStatusLabel }}</span>
+			</div>
+			<div class="space-y-1">
+				<div class="flex items-center justify-between">
+					<span class="text-slate-400">Note</span>
+					<span class="font-medium text-white">{{ accuracyNoteLabel }}</span>
+				</div>
+				<div class="flex items-center justify-between">
+					<span class="text-slate-400">Finger</span>
+					<span class="font-medium text-white">{{ accuracyFingerLabel }}</span>
+				</div>
+				<div class="flex items-center justify-between">
+					<span class="text-slate-400">Distance</span>
+					<span class="font-medium text-white">{{ accuracyDistanceLabel }}</span>
+				</div>
+			</div>
+		</div>
+
 		<NoteTargetEditor
 			v-if="props.inputMode === 'webcam' && props.evaluationMode === 'evaluation'"
 			context="live"
@@ -241,7 +262,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue"
+import { computed, ref, onMounted, onUnmounted, watch } from "vue"
 
 import { useThreeScene } from "@/composables/useThreeScene"
 import { useMediaPipeHolistic } from "@/composables/useMediaPipeHolistic"
@@ -250,6 +271,9 @@ import { usePoseStream } from "@/composables/usePoseStream"
 import { useVRMRig } from "@/composables/useVRMRig"
 import { useTrackerPipeline } from "@/composables/useTrackerPipeline"
 import { useViolinPose } from "@/composables/useViolinPose"
+import { useViolinFingerAccuracy } from "@/composables/useViolinFingerAccuracy"
+import { useAccuracyDebugLine } from "@/composables/useAccuracyDebugLine"
+import { useTrackerSession } from "@/composables/useTrackerSession"
 import { useRuntimeConfig } from "#app"
 import { PoseLandmark, HandLandmark, getPoseLandmark } from "@/utils/landmarks"
 import NoteTargetEditor from "@/components/NoteTargetEditor.vue"
@@ -299,6 +323,28 @@ const mp = useMediaPipeHolistic(videoElement, guideCanvas)
 const pose = usePoseStream()
 const pipeline = useTrackerPipeline()
 const violinPose = useViolinPose()
+const fingerAccuracy = useViolinFingerAccuracy()
+const accuracyDebugLine = useAccuracyDebugLine(three.scene)
+const session = useTrackerSession()
+
+const accuracyReading = computed(() => fingerAccuracy.latestReading.value)
+const accuracyStatusLabel = computed(() => {
+	const status = accuracyReading.value?.status
+	if (!status) return "idle"
+	return status.replace(/-/g, " ")
+})
+const accuracyDistanceLabel = computed(() => {
+	const distanceMeters = accuracyReading.value?.distanceMeters
+	if (distanceMeters == null) return "-"
+	const distanceCm = distanceMeters * 100
+	return `${distanceCm.toFixed(2)} cm`
+})
+const accuracyFingerLabel = computed(() => {
+	return accuracyReading.value?.finger ?? "-"
+})
+const accuracyNoteLabel = computed(() => {
+	return session.selectedNote.value?.label ?? "none"
+})
 
 type CalibrationMap = ReturnType<typeof three.getPropCalibration>
 type ParentDefaultsMap = ReturnType<typeof three.getPropParentDefaults>
@@ -376,6 +422,16 @@ pipeline.registerStage("vrm-rig", (frame) => {
 	if (nextPose) {
 		three.setPropPoseTransform("violin", nextPose)
 	}
+	return frame
+})
+
+pipeline.registerStage("violin-finger-accuracy", (frame) => {
+	const reading = fingerAccuracy.updateForSelectedNote(session.selectedNote.value, {
+		getTargetWorldPoint: three.getViolinFingeringWorldPoint,
+		getLeftDistalFingerWorldPoint: (finger) => vrmRig?.getLeftDistalFingerWorldPosition(finger) ?? null,
+	}, frame.timestamp)
+	accuracyDebugLine.update(reading)
+
 	return frame
 })
 
@@ -617,6 +673,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
 	stopCalibrationScrub()
+	accuracyDebugLine.dispose()
 	three.dispose()
 	mp.stop()
 })
